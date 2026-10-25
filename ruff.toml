@@ -1,0 +1,8 @@
+line-length = 100
+
+[lint]
+select = ["E", "F", "W", "B", "EXE"]
+
+[lint.per-file-ignores]
+# Edu app programs use globals the app provides (roll, set_speed, delay, ...).
+"examples/edu_app/*.py" = ["F821"]
