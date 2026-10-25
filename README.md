@@ -45,17 +45,36 @@ Create a new **Python** program in the Sphero Edu app, delete the template,
 paste in [`examples/edu_app/circles.py`](examples/edu_app/circles.py), and
 press **Start**.
 
+## Run Edu-app programs from your computer
+
+`sphero-dev` runs a program written for the Edu app, unchanged, on a robot
+over Bluetooth or in a simulator. The simulator lets you (or an AI assistant)
+check a program without a robot.
+
+```bash
+pip install -e .        # from a clone; not on PyPI yet
+sphero-dev run examples/edu_app/circles.py --sim --seconds 20
+# Simulated 20.0 s: travelled 2351 cm, ended at (104, 2) cm, path spans 105 x 101 cm
+sphero-dev run examples/edu_app/circles.py --robot SB-1234
+```
+
+See [docs/shim.md](docs/shim.md).
+
 ## What's here
 
 ```
 AGENTS.md                 Rules and context for AI coding assistants
+src/sphero_dev/           The shim: run Edu-app programs on a robot or simulator
+tests/                    Simulator tests (no robot needed)
 docs/
   getting-started-edu-app.md
   getting-started-desktop.md
   api-reference.md        The Sphero Edu command set, grouped by topic
   ecosystem.md            Libraries that exist, which work, which to avoid
   protocol.md             How the Bluetooth protocol works under the hood
+  shim.md                 Running Edu-app programs outside the app
   edu-app-code-transfer.md  Research notes: getting code into the app without copy/paste
+  direct-to-robot-app.md  Design notes: a Claude-powered app that drives the robot directly
 examples/
   edu_app/                Paste-into-the-app programs
   desktop/                Run-on-your-computer programs (spherov2)
@@ -64,11 +83,12 @@ examples/
 ## Roadmap
 
 - More examples (LED matrix, sensors, collisions, IR follow on BOLT)
-- Local "Edu app shim" so Edu-app programs can be linted, type-checked and
-  run on desktop unchanged
+- Confirm the shim's behaviour against the real Edu app and Sphero's docs
 - A way to send code to the Edu app without manual copy/paste (see
   [research notes](docs/edu-app-code-transfer.md))
-- Possibly a PyPI package and TypeScript/JavaScript examples
+- A Claude-powered app that writes programs and runs them on the robot
+  directly (see [design notes](docs/direct-to-robot-app.md))
+- Publish `sphero-dev` to PyPI; TypeScript/JavaScript later
 
 ## Contributing
 

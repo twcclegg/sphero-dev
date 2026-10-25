@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sphero-dev"
+version = "0.1.0"
+description = "Run Sphero Edu app Python programs on a real robot or a simulator, outside the app."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+dependencies = ["spherov2>=0.12", "bleak>=0.20"]
+classifiers = [
+    "Intended Audience :: Education",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+sphero-dev = "sphero_dev.cli:main"
+
+[project.urls]
+Repository = "https://github.com/twcclegg/sphero-dev"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sphero_dev"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

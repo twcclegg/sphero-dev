@@ -1,0 +1,8 @@
+{
+  "include": ["src", "examples", "tests"],
+  "executionEnvironments": [
+    { "root": "examples/edu_app" },
+    { "root": "src" },
+    { "root": "." }
+  ]
+}

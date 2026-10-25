@@ -27,6 +27,11 @@ the user has before writing code. A screenshot of a code editor with **Start**,
   scanning, connect, or cleanup code. An infinite `while True:` loop is fine
   as long as it contains an `await` (otherwise the app freezes).
 - Template: [`examples/edu_app/circles.py`](examples/edu_app/circles.py).
+- **Check it before handing it over:** `sphero-dev run program.py --sim
+  --seconds 20` runs it in the simulator and prints where the robot went
+  (`pip install -e .` in this repo). It catches crashes, missing `await`s
+  that break a loop, and wrong geometry. Its physics are rough (see
+  [docs/shim.md](docs/shim.md)), so it's not proof the robot will behave.
 
 ### 2. Desktop Python (script on a computer, Bluetooth to the robot)
 
@@ -70,14 +75,22 @@ See [docs/ecosystem.md](docs/ecosystem.md).
 ## Working in this repo
 
 - Layout: `docs/` (guides and reference), `examples/edu_app/` (paste into the
-  app), `examples/desktop/` (run with spherov2).
+  app), `examples/desktop/` (run with spherov2), `src/sphero_dev/` (the shim
+  and simulator), `tests/` (pytest, simulator only).
+- Before pushing: `ruff check .` and `python -m pytest`. Every Edu-app
+  example is run in the simulator by the tests.
+- The shim's Edu globals live in `src/sphero_dev/edu.py`; the editor stubs in
+  `src/sphero_dev/edu_builtins.pyi` (copied to
+  `examples/edu_app/__builtins__.pyi`). Keep all three in sync with
+  `docs/api-reference.md` when adding a command.
 - Every example starts with a docstring or comment block saying which
   runtime it's for, which robot(s) it was tested on, and how to run it.
 - Keep examples self-contained single files: users copy them one at a time.
 - Edu-app examples must follow the runtime rules above (no imports, etc.).
-- CI only checks that files compile; it can't reach a robot. Say clearly in
-  your PR or reply whether code was **tested on hardware** or only
-  **syntax-checked**. Don't claim hardware behaviour you didn't observe.
+- CI lints, runs the tests and simulates the examples; it can't reach a
+  robot. Say clearly in your PR or reply whether code was **tested on
+  hardware**, **simulated**, or only **syntax-checked**. Don't claim hardware
+  behaviour you didn't observe.
 - When a fact comes from reverse-engineered or third-party sources rather
   than Sphero's docs, say so in the doc.
 

@@ -2,6 +2,11 @@
 
 **Status: research notes, nothing implemented or verified yet.**
 
+Research so far was done without access to Sphero's sites
+(`edu.sphero.com`, `sdk.sphero.com`, `sphero.docsapp.io` were unreachable
+from the environment used), so the items below come from general knowledge
+and from spherov2's source, which links `edu.sphero.com/remixes/...` pages.
+
 Today the workflow is: write code on a computer (often with an AI
 assistant), get the text onto the tablet, paste it into the Edu app's
 editor. This page tracks ways to cut out the manual steps.
@@ -33,9 +38,23 @@ Ordered from least to most effort.
    `sphero-dev push examples/edu_app/circles.py --program "Circles"`.
    Before building on it, check Sphero's terms of service and ask Sphero
    whether a supported route exists.
-5. **Skip the app.** For desktop-capable users, run the same program through
-   a local shim over spherov2 instead of the app (see the roadmap in the
-   README). Doesn't help iPad-only classrooms.
+5. **Skip the app.** Run the same program from a computer with
+   `sphero-dev run` ([shim.md](shim.md)), which now exists. Doesn't help
+   iPad-only classrooms. The longer-term version of this is a Claude-powered
+   app that talks to the robot directly:
+   [direct-to-robot-app.md](direct-to-robot-app.md).
+
+## How to research options 2-4
+
+With network access to `edu.sphero.com`:
+
+1. Sign in on the web app, create a Python program on a tablet, and see if
+   and how fast it appears on the web (option 2).
+2. Look for import/export, "download", "upload", or share-link features in
+   the program menu (options 2-4).
+3. Read the terms of service on automated access *before* inspecting the
+   web app's network traffic for its save/load calls (option 4). If the
+   terms forbid it, or Sphero offers a supported route, use that instead.
 
 ## Open questions
 
