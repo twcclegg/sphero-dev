@@ -70,7 +70,8 @@ class SimBackend:
     It's for checking program logic without a robot, not for predicting real
     behaviour. Assumptions (not measured): ground speed is
     ``cm_per_unit * speed`` and approaches it with time constant ``tau``;
-    the robot points exactly where it's told, instantly; no slipping.
+    the robot points exactly where it's told, instantly (or at most
+    ``max_turn_rate`` degrees per second, if set); no slipping.
 
     ``delay`` advances virtual time, so a 60 s program runs in well under a
     second. ``delay_overhead`` adds extra time to every wait, to mimic a host
@@ -83,6 +84,7 @@ class SimBackend:
     dt: float = 0.01
     sample_every: float = 0.05
     delay_overhead: float = 0.0
+    max_turn_rate: float | None = None
     log: Callable[[str], None] | None = None
 
     t: float = 0.0
@@ -92,6 +94,7 @@ class SimBackend:
     distance: float = 0.0
     heading: int = 0
     speed: int = 0
+    actual_heading: float = 0.0
     trace: list[tuple[float, float, float, int, float]] = field(default_factory=list)
     _limit: float | None = None
     _next_sample: float = 0.0
@@ -119,13 +122,20 @@ class SimBackend:
     def _step(self, dt: float) -> None:
         target = self.cm_per_unit * self.speed
         self.v += (target - self.v) * min(1.0, dt / self.tau)
-        h = math.radians(self.heading)
+        if self.max_turn_rate is None:
+            self.actual_heading = float(self.heading)
+        else:
+            diff = (self.heading - self.actual_heading + 180) % 360 - 180
+            limit = self.max_turn_rate * dt
+            self.actual_heading = (self.actual_heading + max(-limit, min(limit, diff))) % 360
+        h = math.radians(self.actual_heading)
         self.x += self.v * math.sin(h) * dt
         self.y += self.v * math.cos(h) * dt
         self.distance += abs(self.v) * dt
         self.t += dt
         if self.t >= self._next_sample:
-            self.trace.append((round(self.t, 3), self.x, self.y, self.heading, self.v))
+            self.trace.append((round(self.t, 3), self.x, self.y, round(self.actual_heading),
+                               self.v))
             self._next_sample += self.sample_every
 
     def _say(self, msg: str) -> None:
@@ -161,7 +171,7 @@ class SimBackend:
 
     # --- sensors ---------------------------------------------------------
     def get_velocity(self) -> dict[str, float]:
-        h = math.radians(self.heading)
+        h = math.radians(self.actual_heading)
         return {"x": self.v * math.sin(h), "y": self.v * math.cos(h)}
 
     def get_location(self) -> dict[str, float]:

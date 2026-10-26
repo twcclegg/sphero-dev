@@ -49,3 +49,15 @@ def test_time_limit_on_robot(tmp_path):
     api = FakeApi()
     asyncio.run(run_program(program, RobotBackend(api), seconds=0.2))
     assert api.calls[-1] == ("stop_roll", (None,))
+
+
+def test_bolt_plus_names_match():
+    from spherov2.scanner import all_toys
+
+    from sphero_dev.toys import BOLTPlus
+
+    tt = BOLTPlus.toy_type
+    assert "BP-5FBB".startswith(tt.filter_prefix) and "BP-5FBB".startswith(tt.prefix)
+    # spherov2's own types don't match BOLT+ names, which is why BOLTPlus exists.
+    assert not any("BP-5FBB".startswith(t.toy_type.filter_prefix)
+                   for t in all_toys() if t is not BOLTPlus)

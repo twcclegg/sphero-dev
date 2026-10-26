@@ -43,9 +43,10 @@ the user has before writing code. A screenshot of a code editor with **Start**,
   onto the device and use the app's **Import** option (tested on iPad).
   Opening a `.lab` from the iPad Files app does not import it.
 - **Check it before handing it over:** `sphero-dev run program.py --sim
-  --seconds 20 --delay-overhead 0.1` runs it in the simulator and prints
-  where the robot went (`pip install -e .` in this repo). It catches crashes, missing `await`s
-  that break a loop, and wrong geometry. Its physics are rough (see
+  --seconds 20 --delay-overhead 0.1 --max-turn-rate 90` runs it in the
+  simulator and prints where the robot went (`pip install -e .` in this
+  repo). It catches crashes, missing `await`s that break a loop, and wrong
+  geometry. Its physics are rough (see
   [docs/shim.md](docs/shim.md)), so it's not proof the robot will behave.
 
 ### 2. Desktop Python (script on a computer, Bluetooth to the robot)
@@ -58,7 +59,11 @@ the user has before writing code. A screenshot of a code editor with **Start**,
   (`api.set_speed(100)`, `api.roll(0, 100, 2)` blocks for 2 s) and colors
   are `spherov2.types.Color(r, g, b)`.
 - Find a robot with `scanner.find_toy(toy_name="SB-1234", toy_types=[BOLT])`.
-  BOLT names start with `SB-`.
+  BOLT names start with `SB-`. **BOLT+ names start with `BP-`** (seen on a
+  real BOLT+), which spherov2 doesn't recognize at all, even by exact name.
+  Add a `BOLTPlus` type (`sphero_dev.toys.BOLTPlus`, or the few lines in
+  `examples/desktop/circles.py`) to `toy_types`. Whether every BOLT command
+  works on a BOLT+ from spherov2 isn't tested yet.
 - Template: [`examples/desktop/circles.py`](examples/desktop/circles.py).
 
 ## Libraries to avoid
@@ -87,6 +92,15 @@ See [docs/ecosystem.md](docs/ecosystem.md).
   an assumed step) drifts in the Edu app. `spin(360, t)` after
   `set_speed(...)` also makes a circle, but its size depends on the
   uncalibrated speed.
+- **Tight turns have a speed limit.** Steering from position at a fixed
+  speed 170 on a BOLT+ drew wandering 1.5-2 m loops instead of 1 m. The
+  simulator reproduces that with turning capped near 90°/s
+  (`--max-turn-rate 90`); the real cap isn't measured. For tight paths,
+  adapt speed to tracking error (slow down when drifting out), as
+  `examples/edu_app/circles.py` does, rather than picking a fixed speed.
+- The app's **Location chart** (shown after a run) plots `get_location()`
+  over the run. Ask the user for a screenshot of it; it's the fastest way
+  to see what a driving program really did.
 - Sharp high-speed turns slip. If a path comes out larger than asked, lower
   the speed before tweaking the math.
 
@@ -121,7 +135,8 @@ or app. Verify before relying on them, and update this file when you do:
   `await delay(...)` works; `set_speed`, `set_heading`, `set_main_led`,
   `set_back_led`, `get_velocity` work without `await`.
 - Whether the Edu app's Python allows any imports (`math`, `random`).
-- BOLT+ Bluetooth name prefix and whether spherov2's `BOLT` class fully
-  supports it.
+- Whether spherov2's BOLT commands fully work on a BOLT+ (name prefix is
+  `BP-`, confirmed).
+- How fast a BOLT/BOLT+ can actually turn at a given speed.
 - Where the Edu app's Python command docs live now: `sphero.docsapp.io` no
   longer responds.

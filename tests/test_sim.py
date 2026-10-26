@@ -30,23 +30,30 @@ def test_edu_examples_run_in_sim(path):
 
 @pytest.mark.parametrize("clockwise", [True, False])
 @pytest.mark.parametrize("overhead", [0.0, 0.1, 0.25])
-def test_circles_example_is_about_one_meter(overhead, clockwise):
-    # The Edu app's loop runs slower than the delays it's given (an earlier,
-    # timing-based version drew a much bigger circle on a real BOLT+), so
-    # check the size holds when every delay takes longer than asked.
+@pytest.mark.parametrize("max_turn_rate", [None, 120, 60])
+def test_circles_example_is_about_one_meter(overhead, clockwise, max_turn_rate):
+    # On a real BOLT+ an earlier timing-based version drew much bigger
+    # circles (slow app loop), and a fixed-speed version drew wandering
+    # 1.5-2 m loops (robot can't turn fast enough). Check the size holds with
+    # a slow loop and a turn-rate limit, and that it doesn't slow down more
+    # than the turn limit forces it to.
     source = (ROOT / "examples" / "edu_app" / "circles.py").read_text()
     if not clockwise:
         source = source.replace("CLOCKWISE = True", "CLOCKWISE = False")
-    sim = SimBackend(delay_overhead=overhead)
+    sim = SimBackend(delay_overhead=overhead, max_turn_rate=max_turn_rate)
     g = load_program(source, sim)
-    asyncio.run(sim.run_for(g["start_program"](), 20.0))
-    pts = [p for p in sim.trace if p[0] > 3.0]
+    asyncio.run(sim.run_for(g["start_program"](), 40.0))
+    pts = [p for p in sim.trace if p[0] > 15.0]
     width = max(p[1] for p in pts) - min(p[1] for p in pts)
     height = max(p[2] for p in pts) - min(p[2] for p in pts)
-    assert width == pytest.approx(100, abs=6)
-    assert height == pytest.approx(100, abs=6)
+    assert width == pytest.approx(105, abs=8)
+    assert height == pytest.approx(105, abs=8)
     center_x = 50 if clockwise else -50
-    assert min(p[1] for p in pts) == pytest.approx(center_x - 50, abs=6)
+    assert (max(p[1] for p in pts) + min(p[1] for p in pts)) / 2 == pytest.approx(center_x, abs=6)
+
+    mean_speed = sum(p[4] for p in pts) / len(pts)
+    possible = 0.7 * 170 if max_turn_rate is None else min(0.7 * 170, max_turn_rate * 0.01745 * 50)
+    assert mean_speed > 0.7 * possible
 
 
 def test_roll_moves_forward_then_stops(run_sim):

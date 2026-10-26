@@ -7,7 +7,7 @@ Tested:  syntax-checked only
 
     pip install spherov2 bleak
     python circles.py              # first BOLT found
-    python circles.py SB-1234      # a specific robot
+    python circles.py SB-1234      # a specific robot (BOLT+ names start BP-)
 
 Before starting, aim the robot so its blue tail light faces you.
 Press Ctrl+C to stop.
@@ -26,7 +26,14 @@ import time
 from spherov2 import scanner
 from spherov2.sphero_edu import SpheroEduAPI
 from spherov2.toy.bolt import BOLT
-from spherov2.types import Color
+from spherov2.types import Color, ToyType
+
+
+class BOLTPlus(BOLT):
+    # spherov2 only recognizes BOLTs named SB-...; a BOLT+ advertises as BP-...
+    toy_type = ToyType("Sphero BOLT+", "BP-", "BP", 0.075)
+
+
 
 DIAMETER_CM = 100.0
 SPEED = 170              # 0-255. Higher is faster but slips more on smooth floors.
@@ -48,7 +55,7 @@ def measured_speed(api):
 def main():
     name = sys.argv[1] if len(sys.argv) > 1 else None
     print("Scanning for a BOLT..." if not name else f"Scanning for {name}...")
-    toy = scanner.find_toy(toy_name=name, toy_types=[BOLT])
+    toy = scanner.find_toy(toy_name=name, toy_types=[BOLT, BOLTPlus])
     print(f"Connecting to {toy.name}...")
 
     with SpheroEduAPI(toy) as api:
