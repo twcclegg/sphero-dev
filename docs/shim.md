@@ -51,6 +51,11 @@ measurements:
 - ground speed = 0.7 cm/s per speed unit, reached with a 0.25 s time constant
 - the robot turns to any heading instantly and never slips
 - lights, matrix, IR and sound are accepted and ignored; events never fire
+- `delay(s)` takes exactly `s` unless you pass `--delay-overhead`. On a real
+  BOLT+ in the Edu app, a program that assumed `await delay(0.04)` took
+  exactly 0.04 s drew circles far bigger than 1 m. A slower-than-asked loop
+  is the likely cause (not yet measured), and `--delay-overhead 0.1`
+  reproduces it here, so test anything timing-based with it.
 
 Real robots slip on tight fast turns, vary with floor and battery, and
 report `None` from sensors for the first moments. Calibrate `cm_per_unit`

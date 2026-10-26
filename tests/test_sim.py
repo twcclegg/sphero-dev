@@ -28,15 +28,25 @@ def test_edu_examples_run_in_sim(path):
     assert sim.t == pytest.approx(15.0, abs=0.05)
 
 
-def test_circles_example_is_about_one_meter():
-    sim = SimBackend()
-    asyncio.run(run_program(ROOT / "examples" / "edu_app" / "circles.py", sim, 20.0))
-    # Ignore the first couple of seconds while the speed estimate settles.
+@pytest.mark.parametrize("clockwise", [True, False])
+@pytest.mark.parametrize("overhead", [0.0, 0.1, 0.25])
+def test_circles_example_is_about_one_meter(overhead, clockwise):
+    # The Edu app's loop runs slower than the delays it's given (an earlier,
+    # timing-based version drew a much bigger circle on a real BOLT+), so
+    # check the size holds when every delay takes longer than asked.
+    source = (ROOT / "examples" / "edu_app" / "circles.py").read_text()
+    if not clockwise:
+        source = source.replace("CLOCKWISE = True", "CLOCKWISE = False")
+    sim = SimBackend(delay_overhead=overhead)
+    g = load_program(source, sim)
+    asyncio.run(sim.run_for(g["start_program"](), 20.0))
     pts = [p for p in sim.trace if p[0] > 3.0]
     width = max(p[1] for p in pts) - min(p[1] for p in pts)
     height = max(p[2] for p in pts) - min(p[2] for p in pts)
-    assert width == pytest.approx(100, abs=10)
-    assert height == pytest.approx(100, abs=10)
+    assert width == pytest.approx(100, abs=6)
+    assert height == pytest.approx(100, abs=6)
+    center_x = 50 if clockwise else -50
+    assert min(p[1] for p in pts) == pytest.approx(center_x - 50, abs=6)
 
 
 def test_roll_moves_forward_then_stops(run_sim):

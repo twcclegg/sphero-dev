@@ -23,6 +23,16 @@ the user has before writing code. A screenshot of a code editor with **Start**,
   Instant setters are not: `set_speed`, `set_heading`, `stop_roll`,
   `set_main_led`, `set_back_led`, `set_matrix_pixel`.
 - **Colors are dicts:** `{'r': 255, 'g': 0, 'b': 0}`.
+- **Confirmed on a BOLT+ (Oct 2026):** a program using only these ran in the
+  app without errors: `async def start_program()`, `await delay(...)`,
+  `set_speed`, `set_heading`, `get_velocity()`, `set_main_led({...})`,
+  `set_back_led(255)`, a `while True:` loop, and plain helper functions.
+- **Don't count on `delay` timing.** A circles program that turned by
+  `rate * STEP` each `await delay(STEP)` drew circles far bigger than 1 m on
+  a BOLT+. The likely cause (not yet measured) is that each loop takes longer
+  than the delay; the simulator reproduces it with `--delay-overhead`. Steer
+  from sensors instead (`get_location()`, `get_distance()`, `get_heading()`),
+  as `examples/edu_app/circles.py` does.
 - **Connection, aiming and stopping are handled by the app.** Don't write
   scanning, connect, or cleanup code. An infinite `while True:` loop is fine
   as long as it contains an `await` (otherwise the app freezes).
@@ -30,8 +40,8 @@ the user has before writing code. A screenshot of a code editor with **Start**,
 - The app saves programs as `.lab` files (JSON with the code inside).
   `sphero-dev export` / `import` convert between `.py` and `.lab`.
 - **Check it before handing it over:** `sphero-dev run program.py --sim
-  --seconds 20` runs it in the simulator and prints where the robot went
-  (`pip install -e .` in this repo). It catches crashes, missing `await`s
+  --seconds 20 --delay-overhead 0.1` runs it in the simulator and prints
+  where the robot went (`pip install -e .` in this repo). It catches crashes, missing `await`s
   that break a loop, and wrong geometry. Its physics are rough (see
   [docs/shim.md](docs/shim.md)), so it's not proof the robot will behave.
 
@@ -68,9 +78,12 @@ See [docs/ecosystem.md](docs/ecosystem.md).
   battery. BOLT at ~170 is roughly 1-1.3 m/s on a hard floor (rough, varies).
   For anything distance-based, read `get_velocity()` (cm/s) or
   `get_location()` / `get_distance()` (cm) instead of assuming.
-- Circles: hold speed constant and advance heading at `v / r` rad/s, using
-  measured velocity. `spin(360, t)` after `set_speed(...)` also makes a
-  circle, but its size depends on the uncalibrated speed.
+- Circles: fix a center point, read `get_location()` each step, head along
+  the circle (90° from the center-to-robot direction) with a correction for
+  being off the radius. Turning at a fixed rate from timing (`v / r` times
+  an assumed step) drifts in the Edu app. `spin(360, t)` after
+  `set_speed(...)` also makes a circle, but its size depends on the
+  uncalibrated speed.
 - Sharp high-speed turns slip. If a path comes out larger than asked, lower
   the speed before tweaking the math.
 
@@ -101,7 +114,9 @@ See [docs/ecosystem.md](docs/ecosystem.md).
 These are believed true but not yet confirmed against Sphero's current docs
 or app. Verify before relying on them, and update this file when you do:
 
-- Exactly which Edu-app Python calls are `await`ed.
+- Exactly which Edu-app Python calls are `await`ed. Confirmed so far:
+  `await delay(...)` works; `set_speed`, `set_heading`, `set_main_led`,
+  `set_back_led`, `get_velocity` work without `await`.
 - Whether the Edu app's Python allows any imports (`math`, `random`).
 - BOLT+ Bluetooth name prefix and whether spherov2's `BOLT` class fully
   supports it.

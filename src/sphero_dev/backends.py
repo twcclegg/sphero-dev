@@ -73,13 +73,16 @@ class SimBackend:
     the robot points exactly where it's told, instantly; no slipping.
 
     ``delay`` advances virtual time, so a 60 s program runs in well under a
-    second. ``trace`` holds ``(t, x, y, heading, speed_cm_s)`` samples.
+    second. ``delay_overhead`` adds extra time to every wait, to mimic a host
+    (like the Edu app) whose loop runs slower than the delays it's asked for.
+    ``trace`` holds ``(t, x, y, heading, speed_cm_s)`` samples.
     """
 
     cm_per_unit: float = 0.7
     tau: float = 0.25
     dt: float = 0.01
     sample_every: float = 0.05
+    delay_overhead: float = 0.0
     log: Callable[[str], None] | None = None
 
     t: float = 0.0
@@ -95,7 +98,7 @@ class SimBackend:
 
     # --- clock ---------------------------------------------------------
     async def sleep(self, seconds: float) -> None:
-        end = self.t + max(0.0, seconds)
+        end = self.t + max(0.0, seconds) + self.delay_overhead
         if self._limit is not None:
             end = min(end, self._limit)
         while self.t < end - 1e-9:
