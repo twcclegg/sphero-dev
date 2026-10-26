@@ -1,6 +1,14 @@
 # Getting code into the Sphero Edu app without copy/paste
 
-**Status: research notes, nothing implemented or verified yet.**
+**Status: a working route exists.** `sphero-dev export` makes a `.lab`
+file that the Edu app imports (tested on iPad, BOLT+ program, Oct 2026):
+
+1. `sphero-dev export program.py --name "My Program"`
+2. Get the `.lab` file onto the iPad (AirDrop, Files, iCloud Drive).
+3. In the Edu app, use its **Import** option and pick the file.
+
+Opening the file from the Files app does **not** work: it launches the app
+but imports nothing, for the app's own exports too.
 
 ## Findings (October 2026)
 
@@ -47,20 +55,16 @@ Ordered from least to most effort.
 2. **Edit on the web, run on the tablet.** Ruled out: Sphero Central has no
    code editor any more (see findings). Uploading a `.lab` file (2b) is the
    web route that's left.
-2b. **Generate a `.lab` file.** *Implemented:* `sphero-dev export
+2b. **Generate a `.lab` file.** *Works.* `sphero-dev export
    program.py` writes `program.lab`, and `sphero-dev import program.lab`
    extracts the code. The format was learned from a BOLT+ program exported
    from the app (`tests/data/circles_bolt_plus.lab`); see "The `.lab`
    format" below.
 
-   *Tried (iPad, Oct 2026):* AirDrop a generated `.lab` to the iPad and
-   open it from the Files app. Files launches Sphero Edu (so the app
-   registers `.lab` files), but nothing is imported and no error is shown.
-   Not yet known whether the app's own export behaves the same way, i.e.
-   whether this is the route or the file. Still to try: re-opening an
-   app-exported `.lab` the same way, any Import option inside the app, and
-   uploading on Sphero Central (My Content › Programs) to see if it syncs
-   to the app.
+   *Tested (iPad, Oct 2026):* a generated `.lab` imports through the app's
+   own Import option. Opening any `.lab` (generated or app-exported) from
+   the Files app launches Sphero Edu without importing it. Sphero Central
+   uploads haven't been tried.
 3. **Browser automation of the web editor.** A script (e.g. Playwright) that
    signs into `edu.sphero.com`, opens a program, and replaces its text with a
    local file. Fragile against UI changes, but needs no private API.

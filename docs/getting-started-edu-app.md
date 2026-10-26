@@ -63,7 +63,14 @@ Python; it hasn't been verified for this repo yet.
 
 ## Moving code from your computer into the app
 
-Today: copy the file's text and paste it into the app's editor. On iPad,
-AirDrop or a notes app work well for getting text onto the device. See
-[edu-app-code-transfer.md](edu-app-code-transfer.md) for better options
-being investigated.
+Either copy and paste the code into the editor, or import it as a file:
+
+1. On the computer: `sphero-dev export program.py --name "My Program"`
+   (see [shim.md](shim.md)). This writes `program.lab`, the app's own
+   program format.
+2. Get the file onto the tablet (AirDrop, Files, iCloud Drive).
+3. In the Edu app, use **Import** and pick the file.
+
+Opening the file from the iPad Files app launches Sphero Edu but doesn't
+import it; use the app's Import instead. Details in
+[edu-app-code-transfer.md](edu-app-code-transfer.md).

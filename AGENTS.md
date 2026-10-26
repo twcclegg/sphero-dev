@@ -38,7 +38,10 @@ the user has before writing code. A screenshot of a code editor with **Start**,
   as long as it contains an `await` (otherwise the app freezes).
 - Template: [`examples/edu_app/circles.py`](examples/edu_app/circles.py).
 - The app saves programs as `.lab` files (JSON with the code inside).
-  `sphero-dev export` / `import` convert between `.py` and `.lab`.
+  `sphero-dev export` / `import` convert between `.py` and `.lab`. To hand
+  a user a program without copy/paste: export it, have them get the file
+  onto the device and use the app's **Import** option (tested on iPad).
+  Opening a `.lab` from the iPad Files app does not import it.
 - **Check it before handing it over:** `sphero-dev run program.py --sim
   --seconds 20 --delay-overhead 0.1` runs it in the simulator and prints
   where the robot went (`pip install -e .` in this repo). It catches crashes, missing `await`s
@@ -120,10 +123,5 @@ or app. Verify before relying on them, and update this file when you do:
 - Whether the Edu app's Python allows any imports (`math`, `random`).
 - BOLT+ Bluetooth name prefix and whether spherov2's `BOLT` class fully
   supports it.
-- How to get a `.lab` file into the Edu app. The format is known from a
-  real export, but opening a generated one from the iPad Files app launches
-  the app without importing it (see
-  [docs/edu-app-code-transfer.md](docs/edu-app-code-transfer.md)). Until a
-  route works, copy and paste the code.
 - Where the Edu app's Python command docs live now: `sphero.docsapp.io` no
   longer responds.
