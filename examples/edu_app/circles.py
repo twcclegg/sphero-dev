@@ -1,11 +1,15 @@
 # Runtime: Sphero Edu app (paste into a new Python program)
 # Robot:   Sphero BOLT / BOLT+
-# Tested:  simulated (slow loop, turn-rate limit). Not yet run on hardware.
-#          Two earlier versions ran on a BOLT+ in the app: one
-#          timed its turns and drew circles far bigger than 1 m; the next
-#          steered from position at a fixed speed 170 and drew wandering
-#          ~1.5-2 m loops, most likely because the robot can't turn fast
-#          enough for a 50 cm radius at that speed.
+# Tested:  simulated (slow loop, heading lag, turn-rate limit). Versions run
+#          on a BOLT+ in the app, each fixing the previous one:
+#          1. timed its turns: circles far bigger than 1 m
+#          2. steered from position at fixed speed 170: wandering 1.5-2 m loops
+#             (the robot can't turn fast enough for 50 cm radius at that speed)
+#          3. adapted speed: steady 1.09 x 1.12 m circles, but slowed to
+#             ~36 cm/s because it read the robot's steady heading lag as
+#             "can't turn fast enough"
+#          This version (4) adds an integral term to cancel that lag. Not yet
+#          run on hardware.
 #
 # Drives fast circles about 1 meter across.
 # Aim the robot (AIM button) so the blue tail light faces you, then press Start.
@@ -28,6 +32,8 @@ MAX_SPEED = 170      # 0-255, the fastest it will try
 START_SPEED = 90     # starts here and speeds up while it can hold the circle
 MIN_SPEED = 40
 GAIN = 2.0           # degrees of extra turn per cm off the circle
+I_GAIN = 0.02        # extra turn that builds up per cm off, per cm travelled
+MAX_INTEGRAL = 30    # degrees
 MAX_CORRECTION = 45  # degrees
 STEP_S = 0.04        # seconds between steering updates
 CLOCKWISE = True
@@ -70,6 +76,7 @@ async def start_program():
     set_heading(0)
     set_speed(sent_speed)
     last_distance = 0.0
+    integral = 0.0
 
     while True:
         await delay(STEP_S)
@@ -91,7 +98,16 @@ async def start_program():
         if lead > 30:  # guard against a jump in the first distance reading
             lead = 30
 
-        correction = GAIN * off_by
+        # The robot's heading lags behind what we ask, so it sits a little
+        # outside the circle. The integral slowly adds turn until that
+        # steady offset is gone (per cm travelled, capped).
+        integral = integral + I_GAIN * off_by * step_cm
+        if integral > MAX_INTEGRAL:
+            integral = MAX_INTEGRAL
+        if integral < -MAX_INTEGRAL:
+            integral = -MAX_INTEGRAL
+
+        correction = GAIN * off_by + integral
         if correction > MAX_CORRECTION:
             correction = MAX_CORRECTION
         if correction < -MAX_CORRECTION:
@@ -102,11 +118,12 @@ async def start_program():
         heading = angle_deg(dx, dy) + direction * (90 + correction + lead)
         set_heading(int(heading) % 360)
 
-        # Drifting out means the robot can't turn tightly enough at this
-        # speed: slow down in proportion. On the circle, speed back up.
+        # Still drifting out (even with the integral) means the robot can't
+        # turn tightly enough at this speed: slow down in proportion. On the
+        # circle, speed back up.
         # Scaled by distance covered, so it adapts at the same rate per cm
         # however fast the app's loop runs (about 4 cm per step at 25/s).
-        change = 4 - off_by
+        change = 2 - off_by
         if change > 0.3:
             change = 0.3
         if change < -3:

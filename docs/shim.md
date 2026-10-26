@@ -50,9 +50,10 @@ measurements:
 
 - ground speed = 0.7 cm/s per speed unit, reached with a 0.25 s time constant
 - the robot turns to any heading instantly and never slips, unless you pass
-  `--max-turn-rate DEG_S`. A BOLT+ that couldn't hold a 1 m circle at speed
-  170 matched the simulator with about 90°/s, so try `--max-turn-rate 90`
-  for anything with tight turns
+  `--turn-lag S` (heading approaches the command with that time constant)
+  and/or `--max-turn-rate DEG_S`. A real BOLT+ circle run matched
+  `--turn-lag 0.2` closely (radius, speed and lap time); its recorded path
+  is in `tests/data/` and a test checks the simulator still matches it
 - lights, matrix, IR and sound are accepted and ignored; events never fire
 - `delay(s)` takes exactly `s` unless you pass `--delay-overhead`. On a real
   BOLT+ in the Edu app, a program that assumed `await delay(0.04)` took

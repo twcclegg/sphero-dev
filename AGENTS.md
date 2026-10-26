@@ -43,7 +43,7 @@ the user has before writing code. A screenshot of a code editor with **Start**,
   onto the device and use the app's **Import** option (tested on iPad).
   Opening a `.lab` from the iPad Files app does not import it.
 - **Check it before handing it over:** `sphero-dev run program.py --sim
-  --seconds 20 --delay-overhead 0.1 --max-turn-rate 90` runs it in the
+  --seconds 20 --delay-overhead 0.1 --turn-lag 0.2` runs it in the
   simulator and prints where the robot went (`pip install -e .` in this
   repo). It catches crashes, missing `await`s that break a loop, and wrong
   geometry. Its physics are rough (see
@@ -92,15 +92,21 @@ See [docs/ecosystem.md](docs/ecosystem.md).
   an assumed step) drifts in the Edu app. `spin(360, t)` after
   `set_speed(...)` also makes a circle, but its size depends on the
   uncalibrated speed.
-- **Tight turns have a speed limit.** Steering from position at a fixed
-  speed 170 on a BOLT+ drew wandering 1.5-2 m loops instead of 1 m. The
-  simulator reproduces that with turning capped near 90°/s
-  (`--max-turn-rate 90`); the real cap isn't measured. For tight paths,
-  adapt speed to tracking error (slow down when drifting out), as
-  `examples/edu_app/circles.py` does, rather than picking a fixed speed.
+- **Measured on a BOLT+ (Oct 2026, laminate):** speed 90 gave about
+  63-65 cm/s (the simulator's 0.7 cm/s per unit fits); it turned at least
+  82°/s at about 60 cm/s; its heading lags the command enough that a pure
+  proportional circle-follower sits ~4 cm outside the circle (the simulator
+  reproduces this with `--turn-lag 0.2`). Steering that relies on hitting
+  the commanded heading exactly needs an integral term; see
+  `examples/edu_app/circles.py`.
+- Tight turns have a speed limit: a fixed speed 170 on a 50 cm radius drew
+  wandering 1.5-2 m loops. For tight paths, adapt speed to tracking error
+  rather than picking a fixed speed.
 - The app's **Location chart** (shown after a run) plots `get_location()`
-  over the run. Ask the user for a screenshot of it; it's the fastest way
-  to see what a driving program really did.
+  over the run, and the app can export every sensor as CSV (Location,
+  Velocity, Distance, Gyroscope, Orientation, Accelerometer, Ambient Light;
+  about 6.7 samples/s). Ask the user for the CSVs, or a screenshot of the
+  chart; they're the best way to see what a driving program really did.
 - Sharp high-speed turns slip. If a path comes out larger than asked, lower
   the speed before tweaking the math.
 
@@ -137,6 +143,6 @@ or app. Verify before relying on them, and update this file when you do:
 - Whether the Edu app's Python allows any imports (`math`, `random`).
 - Whether spherov2's BOLT commands fully work on a BOLT+ (name prefix is
   `BP-`, confirmed).
-- How fast a BOLT/BOLT+ can actually turn at a given speed.
+- The BOLT+'s actual top turn rate at each speed (≥82°/s at ~60 cm/s seen).
 - Where the Edu app's Python command docs live now: `sphero.docsapp.io` no
   longer responds.

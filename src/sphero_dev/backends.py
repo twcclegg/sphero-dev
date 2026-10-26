@@ -70,8 +70,9 @@ class SimBackend:
     It's for checking program logic without a robot, not for predicting real
     behaviour. Assumptions (not measured): ground speed is
     ``cm_per_unit * speed`` and approaches it with time constant ``tau``;
-    the robot points exactly where it's told, instantly (or at most
-    ``max_turn_rate`` degrees per second, if set); no slipping.
+    the robot points exactly where it's told, instantly (or approaching it
+    with time constant ``turn_lag``, at most ``max_turn_rate`` degrees per
+    second, if set); no slipping.
 
     ``delay`` advances virtual time, so a 60 s program runs in well under a
     second. ``delay_overhead`` adds extra time to every wait, to mimic a host
@@ -85,6 +86,7 @@ class SimBackend:
     sample_every: float = 0.05
     delay_overhead: float = 0.0
     max_turn_rate: float | None = None
+    turn_lag: float = 0.0
     log: Callable[[str], None] | None = None
 
     t: float = 0.0
@@ -122,12 +124,12 @@ class SimBackend:
     def _step(self, dt: float) -> None:
         target = self.cm_per_unit * self.speed
         self.v += (target - self.v) * min(1.0, dt / self.tau)
-        if self.max_turn_rate is None:
-            self.actual_heading = float(self.heading)
-        else:
-            diff = (self.heading - self.actual_heading + 180) % 360 - 180
+        diff = (self.heading - self.actual_heading + 180) % 360 - 180
+        turn = diff if self.turn_lag <= 0 else diff * min(1.0, dt / self.turn_lag)
+        if self.max_turn_rate is not None:
             limit = self.max_turn_rate * dt
-            self.actual_heading = (self.actual_heading + max(-limit, min(limit, diff))) % 360
+            turn = max(-limit, min(limit, turn))
+        self.actual_heading = (self.actual_heading + turn) % 360
         h = math.radians(self.actual_heading)
         self.x += self.v * math.sin(h) * dt
         self.y += self.v * math.cos(h) * dt

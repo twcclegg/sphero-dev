@@ -17,7 +17,7 @@ from .edu import run_program
 
 def _run_sim(args: argparse.Namespace) -> int:
     sim = SimBackend(log=print if args.verbose else None, delay_overhead=args.delay_overhead,
-                     max_turn_rate=args.max_turn_rate)
+                     max_turn_rate=args.max_turn_rate, turn_lag=args.turn_lag)
     seconds = args.seconds if args.seconds is not None else 30.0
     asyncio.run(run_program(args.program, sim, seconds))
     xs = [p[1] for p in sim.trace] or [0.0]
@@ -98,6 +98,8 @@ def main(argv: list[str] | None = None) -> int:
                      help="sim only: extra seconds per delay, like a slow app loop (try 0.1)")
     run.add_argument("--max-turn-rate", type=float, metavar="DEG_S",
                      help="sim only: cap how fast the robot turns, in degrees/s (try 90)")
+    run.add_argument("--turn-lag", type=float, default=0.0, metavar="S",
+                     help="sim only: heading response time constant (a BOLT+ fits 0.2)")
     run.add_argument("-v", "--verbose", action="store_true", help="sim only: log commands")
 
     stubs = sub.add_parser("stubs", help="write __builtins__.pyi so editors know the Edu commands")
