@@ -51,9 +51,16 @@ Ordered from least to most effort.
    program.py` writes `program.lab`, and `sphero-dev import program.lab`
    extracts the code. The format was learned from a BOLT+ program exported
    from the app (`tests/data/circles_bolt_plus.lab`); see "The `.lab`
-   format" below. Still to confirm: that the app opens a generated file
-   (AirDrop / Files on iPad), and whether uploads to Sphero Central show up
-   in the app.
+   format" below.
+
+   *Tried (iPad, Oct 2026):* AirDrop a generated `.lab` to the iPad and
+   open it from the Files app. Files launches Sphero Edu (so the app
+   registers `.lab` files), but nothing is imported and no error is shown.
+   Not yet known whether the app's own export behaves the same way, i.e.
+   whether this is the route or the file. Still to try: re-opening an
+   app-exported `.lab` the same way, any Import option inside the app, and
+   uploading on Sphero Central (My Content › Programs) to see if it syncs
+   to the app.
 3. **Browser automation of the web editor.** A script (e.g. Playwright) that
    signs into `edu.sphero.com`, opens a program, and replaces its text with a
    local file. Fragile against UI changes, but needs no private API.
