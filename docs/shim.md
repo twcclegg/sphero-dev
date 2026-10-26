@@ -13,6 +13,14 @@ sphero-dev run examples/edu_app/circles.py                      # first robot fo
 sphero-dev run examples/edu_app/circles.py --robot SB-1234 --seconds 60
 ```
 
+`run` also accepts `.lab` files exported from the Edu app. To move programs
+between this repo and the app:
+
+```bash
+sphero-dev export examples/edu_app/circles.py --name "Circles"   # -> circles.lab
+sphero-dev import "Untitled Program.lab" -o program.py
+```
+
 Ctrl+C stops a robot run. Aim the robot first so its blue tail light faces
 you; 0° is wherever it's pointing when the program starts.
 

@@ -47,12 +47,12 @@ Ordered from least to most effort.
 2. **Edit on the web, run on the tablet.** Ruled out: Sphero Central has no
    code editor any more (see findings). Uploading a `.lab` file (2b) is the
    web route that's left.
-2b. **Generate a `.lab` file.** Learn the format from a Python program
-   exported from the app, write `sphero-dev export program.py`, then open
-   the file in the app (AirDrop / Files on iPad) or upload it on Sphero
-   Central. Next step: export one Python program from the Edu app as
-   `.lab` and add it to this repo as a sample. Not yet confirmed: that the
-   app can import `.lab` files, and that uploads to Sphero Central show up
+2b. **Generate a `.lab` file.** *Implemented:* `sphero-dev export
+   program.py` writes `program.lab`, and `sphero-dev import program.lab`
+   extracts the code. The format was learned from a BOLT+ program exported
+   from the app (`tests/data/circles_bolt_plus.lab`); see "The `.lab`
+   format" below. Still to confirm: that the app opens a generated file
+   (AirDrop / Files on iPad), and whether uploads to Sphero Central show up
    in the app.
 3. **Browser automation of the web editor.** A script (e.g. Playwright) that
    signs into `edu.sphero.com`, opens a program, and replaces its text with a
@@ -67,6 +67,30 @@ Ordered from least to most effort.
    iPad-only classrooms. The longer-term version of this is a Claude-powered
    app that talks to the robot directly:
    [direct-to-robot-app.md](direct-to-robot-app.md).
+
+## The `.lab` format
+
+A `.lab` file is one line of JSON. From an Edu-app export (October 2026):
+
+```json
+{"program_type":"text",
+ "data":"15;python&# Fast circles about 1 meter across.\n...",
+ "robots":[{"id":19,"name":"Sphero BOLT+"}],
+ "name":"Untitled Program (2)",
+ "identifier":"AACAD1AE-6DDF-4D83-B7A7-9F8A0719613E",
+ "images":[{"large":{"width":0,"height":0},"thumbnail":{"width":0,"height":0}}]}
+```
+
+- `data` is `15;python&` followed by the source code, with the trailing
+  newline removed. The meaning of `15` is unknown (an editor or format
+  version?); `sphero-dev` copies it.
+- `robots` lists the robot types the program is for. Only BOLT+ (`19`) is
+  known so far; exports for other robots would fill in the table in
+  `src/sphero_dev/lab.py`.
+- `identifier` is an uppercase UUID. `sphero-dev export` makes a new one per
+  file, so importing it twice probably creates two programs.
+- The app writes compact JSON with `/` escaped as `\/`; `sphero-dev`
+  matches it byte for byte.
 
 ## How to research options 2-4
 

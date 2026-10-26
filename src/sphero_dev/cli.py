@@ -10,6 +10,7 @@ import sys
 from importlib import resources
 from pathlib import Path
 
+from . import lab
 from .backends import RobotBackend, SimBackend
 from .edu import run_program
 
@@ -58,12 +59,31 @@ def _stubs(args: argparse.Namespace) -> int:
     return 0
 
 
+def _export(args: argparse.Namespace) -> int:
+    src = Path(args.program)
+    dest = Path(args.output) if args.output else src.with_suffix(".lab")
+    lab.write(lab.LabProgram(name=args.name or src.stem, code=src.read_text(encoding="utf-8")),
+              dest)
+    print(f"Wrote {dest}. Open it with the Sphero Edu app to add it to your programs.")
+    return 0
+
+
+def _import(args: argparse.Namespace) -> int:
+    src = Path(args.lab_file)
+    program = lab.read(src)
+    dest = Path(args.output) if args.output else src.with_suffix(".py")
+    dest.write_text(program.code + "\n", encoding="utf-8")
+    print(f"Wrote {dest} (program {program.name!r}).")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="sphero-dev")
     sub = parser.add_subparsers(dest="command", required=True)
 
     run = sub.add_parser("run", help="run a Sphero Edu app program on a robot or the simulator")
-    run.add_argument("program", help="an Edu-app .py file with `async def start_program():`")
+    run.add_argument("program",
+                     help="an Edu-app .py or .lab file with `async def start_program():`")
     where = run.add_mutually_exclusive_group()
     where.add_argument("--robot", metavar="NAME",
                        help="robot name, e.g. SB-1234 (default: first found)")
@@ -76,9 +96,22 @@ def main(argv: list[str] | None = None) -> int:
     stubs = sub.add_parser("stubs", help="write __builtins__.pyi so editors know the Edu commands")
     stubs.add_argument("directory", nargs="?", default=".")
 
+    export = sub.add_parser("export", help="convert an Edu-app .py program to a .lab file")
+    export.add_argument("program")
+    export.add_argument("-o", "--output", help="output path (default: same name, .lab)")
+    export.add_argument("--name", help="program name shown in the app (default: file name)")
+
+    imp = sub.add_parser("import", help="extract the Python code from a .lab file")
+    imp.add_argument("lab_file")
+    imp.add_argument("-o", "--output", help="output path (default: same name, .py)")
+
     args = parser.parse_args(argv)
     if args.command == "stubs":
         return _stubs(args)
+    if args.command == "export":
+        return _export(args)
+    if args.command == "import":
+        return _import(args)
     return _run_sim(args) if args.sim else _run_robot(args)
 
 

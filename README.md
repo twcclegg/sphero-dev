@@ -56,6 +56,7 @@ pip install -e .        # from a clone; not on PyPI yet
 sphero-dev run examples/edu_app/circles.py --sim --seconds 20
 # Simulated 20.0 s: travelled 2351 cm, ended at (104, 2) cm, path spans 105 x 101 cm
 sphero-dev run examples/edu_app/circles.py --robot SB-1234
+sphero-dev export examples/edu_app/circles.py   # -> circles.lab, the Edu app's file format
 ```
 
 See [docs/shim.md](docs/shim.md).

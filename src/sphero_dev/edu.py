@@ -197,9 +197,15 @@ def load_program(source: str, backend: Any, filename: str = "<program>") -> dict
 
 
 async def run_program(path: str | Path, backend: Any, seconds: float | None = None) -> None:
-    """Run an Edu-app program file until it returns, exits, or ``seconds`` pass."""
+    """Run an Edu-app program (``.py`` or ``.lab``) until it returns, exits, or ``seconds`` pass."""
     path = Path(path)
-    g = load_program(path.read_text(encoding="utf-8"), backend, str(path))
+    if path.suffix == ".lab":
+        from . import lab
+
+        source = lab.read(path).code
+    else:
+        source = path.read_text(encoding="utf-8")
+    g = load_program(source, backend, str(path))
     try:
         if seconds is None:
             await g["start_program"]()
