@@ -205,7 +205,13 @@ async def run_program(path: str | Path, backend: Any, seconds: float | None = No
         source = lab.read(path).code
     else:
         source = path.read_text(encoding="utf-8")
-    g = load_program(source, backend, str(path))
+    await run_source(source, backend, seconds, str(path))
+
+
+async def run_source(source: str, backend: Any, seconds: float | None = None,
+                     filename: str = "<program>") -> None:
+    """Like :func:`run_program`, for a program given as a string."""
+    g = load_program(source, backend, filename)
     try:
         if seconds is None:
             await g["start_program"]()

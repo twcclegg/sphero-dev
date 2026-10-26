@@ -11,6 +11,7 @@ sphero-dev run examples/edu_app/circles.py --sim                # simulator, 30 
 sphero-dev run examples/edu_app/circles.py --sim --seconds 20 --trace path.csv
 sphero-dev run examples/edu_app/circles.py                      # first robot found
 sphero-dev run examples/edu_app/circles.py --robot SB-1234 --seconds 60
+sphero-dev run examples/edu_app/circles.py --robot BP-5FBB --max-speed 100  # cap speed
 ```
 
 `run` also accepts `.lab` files exported from the Edu app. To move programs

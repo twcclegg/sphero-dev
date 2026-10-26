@@ -61,6 +61,17 @@ sphero-dev export examples/edu_app/circles.py   # -> circles.lab; import it in t
 
 See [docs/shim.md](docs/shim.md).
 
+## Ask Claude to write and run a program
+
+```bash
+pip install -e '.[ai]' && export ANTHROPIC_API_KEY=...
+sphero-dev ask "drive a square, 50 cm a side, green on each corner" --robot BP-5FBB
+```
+
+Claude writes an Edu-app program and checks it in the simulator, and you
+choose whether to run it, save it (`.py` and `.lab`), or describe a change.
+Linux and macOS. See [docs/ask.md](docs/ask.md).
+
 ## What's here
 
 ```
@@ -74,6 +85,7 @@ docs/
   ecosystem.md            Libraries that exist, which work, which to avoid
   protocol.md             How the Bluetooth protocol works under the hood
   shim.md                 Running Edu-app programs outside the app
+  ask.md                  sphero-dev ask: Claude writes the program, you run it
   edu-app-code-transfer.md  Research notes: getting code into the app without copy/paste
   direct-to-robot-app.md  Design notes: a Claude-powered app that drives the robot directly
   direct-control-feasibility.md  Is the Bluetooth protocol known? BOLT+, iPad, licensing
@@ -88,8 +100,8 @@ examples/
 - Confirm the shim's behaviour against the real Edu app and Sphero's docs
 - A way to send code to the Edu app without manual copy/paste (see
   [research notes](docs/edu-app-code-transfer.md))
-- A Claude-powered app that writes programs and runs them on the robot
-  directly (see [design notes](docs/direct-to-robot-app.md))
+- Try `sphero-dev ask` against the real API and a BOLT+, then grow it
+  (see [design notes](docs/direct-to-robot-app.md))
 - Publish `sphero-dev` to PyPI; TypeScript/JavaScript later
 
 ## Contributing

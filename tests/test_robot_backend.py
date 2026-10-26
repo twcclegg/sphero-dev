@@ -61,3 +61,17 @@ def test_bolt_plus_names_match():
     # spherov2's own types don't match BOLT+ names, which is why BOLTPlus exists.
     assert not any("BP-5FBB".startswith(t.toy_type.filter_prefix)
                    for t in all_toys() if t is not BOLTPlus)
+
+
+def test_max_speed_caps_set_speed_and_roll():
+    from sphero_dev.edu import run_source
+
+    source = (
+        "async def start_program():\n"
+        "    set_speed(255)\n"
+        "    await roll(0, -200, 0.01)\n"
+    )
+    api = FakeApi()
+    asyncio.run(run_source(source, RobotBackend(api, max_speed=100), seconds=5))
+    speeds = [args[0] for name, args in api.calls if name == "set_speed"]
+    assert speeds == [100, 100]  # negative roll turns into heading + 180, speed 200 -> 100

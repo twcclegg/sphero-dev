@@ -20,14 +20,22 @@ class RobotBackend:
     """Drives a real robot through spherov2's ``SpheroEduAPI``.
 
     ``api`` must already be entered (``with SpheroEduAPI(toy) as api``).
+    ``max_speed`` caps every speed the program asks for (0-255).
     """
 
-    def __init__(self, api: Any):
+    def __init__(self, api: Any, max_speed: int = 255):
         self.api = api
+        self.max_speed = max_speed
         self._loop: asyncio.AbstractEventLoop | None = None
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.api, name)
+
+    def _cap(self, speed: int) -> int:
+        return max(-self.max_speed, min(self.max_speed, speed))
+
+    def set_speed(self, speed: int) -> None:
+        self.api.set_speed(self._cap(speed))
 
     @staticmethod
     def color(r: int, g: int, b: int) -> Any:
@@ -39,7 +47,7 @@ class RobotBackend:
         await asyncio.sleep(seconds)
 
     async def raw_motor(self, left: int, right: int, duration: float) -> None:
-        await asyncio.to_thread(self.api.raw_motor, left, right, duration)
+        await asyncio.to_thread(self.api.raw_motor, self._cap(left), self._cap(right), duration)
 
     def register_event(self, name: str, handler: Callable[..., Any]) -> None:
         from spherov2.sphero_edu import EventType
@@ -77,6 +85,7 @@ class SimBackend:
     ``delay`` advances virtual time, so a 60 s program runs in well under a
     second. ``delay_overhead`` adds extra time to every wait, to mimic a host
     (like the Edu app) whose loop runs slower than the delays it's asked for.
+    ``max_speed`` caps commanded speed, like ``RobotBackend``'s cap.
     ``trace`` holds ``(t, x, y, heading, speed_cm_s)`` samples.
     """
 
@@ -87,6 +96,7 @@ class SimBackend:
     delay_overhead: float = 0.0
     max_turn_rate: float | None = None
     turn_lag: float = 0.0
+    max_speed: int = 255
     log: Callable[[str], None] | None = None
 
     t: float = 0.0
@@ -150,7 +160,7 @@ class SimBackend:
         return (r, g, b)
 
     def set_speed(self, speed: int) -> None:
-        self.speed = max(-255, min(255, speed))
+        self.speed = max(-self.max_speed, min(self.max_speed, speed))
         self._say(f"set_speed({self.speed})")
 
     def set_heading(self, heading: int) -> None:
@@ -164,7 +174,7 @@ class SimBackend:
 
     async def raw_motor(self, left: int, right: int, duration: float) -> None:
         # Approximation: average power as speed, no turning.
-        self.speed = (left + right) // 2
+        self.speed = max(-self.max_speed, min(self.max_speed, (left + right) // 2))
         await self.sleep(duration)
         self.speed = 0
 

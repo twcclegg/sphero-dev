@@ -117,6 +117,11 @@ See [docs/ecosystem.md](docs/ecosystem.md).
   and simulator), `tests/` (pytest, simulator only).
 - Before pushing: `ruff check .` and `python -m pytest`. Every Edu-app
   example is run in the simulator by the tests.
+- `sphero-dev ask` (`src/sphero_dev/ask.py`, `ask_cli.py`) puts the Edu-app
+  rules above, the stubs and `docs/api-reference.md` in Claude's system
+  prompt. When you learn a new runtime or driving fact, update `RULES` in
+  `ask.py` as well as this file. Its tests use a fake client, never the
+  network.
 - The shim's Edu globals live in `src/sphero_dev/edu.py`; the editor stubs in
   `src/sphero_dev/edu_builtins.pyi` (copied to
   `examples/edu_app/__builtins__.pyi`). Keep all three in sync with

@@ -1,4 +1,4 @@
-"""Command line: ``sphero-dev run program.py [--robot NAME | --sim]``."""
+"""Command line: ``sphero-dev run program.py [--robot NAME | --sim]``, ``sphero-dev ask``, ..."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from pathlib import Path
 
 from . import lab
 from .backends import RobotBackend, SimBackend
-from .edu import run_program
+from .edu import run_program, run_source
 
 
 def _run_sim(args: argparse.Namespace) -> int:
@@ -34,21 +34,29 @@ def _run_sim(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_robot(args: argparse.Namespace) -> int:
+def run_on_robot(source: str, robot: str | None, seconds: float | None,
+                 max_speed: int = 255, filename: str = "<program>") -> None:
+    """Find a robot, connect, and run an Edu-app program on it. Ctrl-C stops it."""
     from spherov2 import scanner
     from spherov2.sphero_edu import SpheroEduAPI
 
     from .toys import BOLTPlus
 
-    print(f"Scanning for {args.robot or 'a robot'}...")
-    toy = scanner.find_toy(toy_name=args.robot, toy_types=[*scanner.all_toys(), BOLTPlus])
+    print(f"Scanning for {robot or 'a robot'}...")
+    toy = scanner.find_toy(toy_name=robot, toy_types=[*scanner.all_toys(), BOLTPlus])
     print(f"Connecting to {toy.name}. Aim it so the blue tail light faces you.")
     with SpheroEduAPI(toy) as api:
         try:
-            asyncio.run(run_program(args.program, RobotBackend(api), args.seconds))
+            asyncio.run(run_source(source, RobotBackend(api, max_speed), seconds, filename))
         except KeyboardInterrupt:
             print("\nStopping.")
             api.stop_roll()
+
+
+def _run_robot(args: argparse.Namespace) -> int:
+    path = Path(args.program)
+    source = lab.read(path).code if path.suffix == ".lab" else path.read_text(encoding="utf-8")
+    run_on_robot(source, args.robot, args.seconds, args.max_speed, str(path))
     return 0
 
 
@@ -93,6 +101,8 @@ def main(argv: list[str] | None = None) -> int:
     where.add_argument("--sim", action="store_true",
                        help="run in the simulator instead of on a robot")
     run.add_argument("--seconds", type=float, help="stop after this long (sim default: 30)")
+    run.add_argument("--max-speed", type=int, default=255, metavar="N",
+                     help="robot only: cap every speed the program asks for (0-255)")
     run.add_argument("--trace", metavar="CSV", help="sim only: write the path to a CSV file")
     run.add_argument("--delay-overhead", type=float, default=0.0, metavar="S",
                      help="sim only: extra seconds per delay, like a slow app loop (try 0.1)")
@@ -114,7 +124,25 @@ def main(argv: list[str] | None = None) -> int:
     imp.add_argument("lab_file")
     imp.add_argument("-o", "--output", help="output path (default: same name, .py)")
 
+    ask = sub.add_parser("ask", help="describe a program; Claude writes it, the simulator "
+                                     "checks it, you choose whether to run it")
+    ask.add_argument("request", nargs="*",
+                     help='what to do, e.g. "drive a square, 50 cm a side" (asked if omitted)')
+    ask.add_argument("--robot", metavar="NAME", help="robot name, e.g. BP-5FBB "
+                                                     "(default: first found)")
+    ask.add_argument("--seconds", type=float, default=30.0,
+                     help="stop each run after this long (default: 30)")
+    ask.add_argument("--max-speed", type=int, default=150, metavar="N",
+                     help="cap on speed, 0-255, for the robot and the simulator (default: 150)")
+    ask.add_argument("--effort", default="medium", choices=["low", "medium", "high", "xhigh"],
+                     help="how hard Claude thinks (default: medium)")
+    ask.add_argument("-o", "--out-dir", default=".", help="where [s]ave writes files")
+
     args = parser.parse_args(argv)
+    if args.command == "ask":
+        from .ask_cli import ask_main
+
+        return ask_main(args)
     if args.command == "stubs":
         return _stubs(args)
     if args.command == "export":

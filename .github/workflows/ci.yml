@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install
-        run: pip install -e '.[test]' ruff
+        run: pip install -e '.[test,ai]' ruff
       - name: Lint
         run: ruff check .
       - name: Tests (simulator)

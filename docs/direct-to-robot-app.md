@@ -1,7 +1,7 @@
 # Design notes: a Claude-powered app that drives the robot directly
 
-**Status: proposal.** Nothing here is built yet beyond the pieces marked
-*exists*. Protocol, BOLT+, iPad and licensing research is in
+**Status: first version built as a CLI**: [`sphero-dev ask`](ask.md).
+The rest of this page is the design it follows, and the options beyond it. Protocol, BOLT+, iPad and licensing research is in
 [direct-control-feasibility.md](direct-control-feasibility.md).
 
 The idea: someone types *"drive a figure eight about a meter across, blue
@@ -29,8 +29,8 @@ and this repo already has a Python host.
 | Rules and API reference to put in Claude's system prompt | *exists*: AGENTS.md (Edu section), [api-reference.md](api-reference.md) |
 | Run a program on a robot from Python | *exists*: `sphero-dev run` ([shim.md](shim.md)) |
 | Simulator to check a program before it moves a robot | *exists*: `SimBackend` |
-| Claude API call that turns a request into a program | to build |
-| UI (chat box, code view, Run / Stop) | to build |
+| Claude API call that turns a request into a program | *exists*: `sphero-dev ask` ([ask.md](ask.md)), not yet run against the real API |
+| UI (chat box, code view, Run / Stop) | *exists* as a terminal prompt; a GUI is later |
 
 ## Generation loop
 
