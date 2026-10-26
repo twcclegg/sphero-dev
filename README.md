@@ -76,6 +76,7 @@ docs/
   shim.md                 Running Edu-app programs outside the app
   edu-app-code-transfer.md  Research notes: getting code into the app without copy/paste
   direct-to-robot-app.md  Design notes: a Claude-powered app that drives the robot directly
+  direct-control-feasibility.md  Is the Bluetooth protocol known? BOLT+, iPad, licensing
 examples/
   edu_app/                Paste-into-the-app programs
   desktop/                Run-on-your-computer programs (spherov2)

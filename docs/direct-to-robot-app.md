@@ -1,7 +1,8 @@
 # Design notes: a Claude-powered app that drives the robot directly
 
 **Status: proposal.** Nothing here is built yet beyond the pieces marked
-*exists*.
+*exists*. Protocol, BOLT+, iPad and licensing research is in
+[direct-control-feasibility.md](direct-control-feasibility.md).
 
 The idea: someone types *"drive a figure eight about a meter across, blue
 while turning left and red while turning right"*. Claude writes the program,
@@ -102,7 +103,6 @@ audience.
 
 - Does the Edu app's Python allow imports? If programs must stay pasteable
   into the app, generated code must avoid them.
-- Sphero's terms of service for third-party apps controlling their robots
-  over Bluetooth (spherov2 and others have done it openly for years, but
-  check before distributing an app).
-- BOLT+ advertising name and any protocol differences from BOLT.
+- Sphero's terms for third-party apps: see the licensing section of
+  [direct-control-feasibility.md](direct-control-feasibility.md).
+- Protocol differences between BOLT+ and BOLT (the `BP-` name is confirmed).
