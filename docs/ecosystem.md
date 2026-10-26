@@ -7,8 +7,9 @@ What exists, what works, and what to use. Last reviewed October 2026.
 | What | Robots | Notes |
 |---|---|---|
 | **Sphero Edu app** | All current robots | Draw, Blocks, JavaScript and Python. The easiest path. |
-| [sdk.sphero.com](https://sdk.sphero.com/documentation/sdk-documents) | | SDK docs, including the v2 Bluetooth API spec |
-| `sphero.docsapp.io` | | Sphero Edu JavaScript/Python command docs |
+| [sdk.sphero.com](https://sdk.sphero.com/documentation/sdk-documents) | Mostly RVR | Public SDK site: RVR + Raspberry Pi / micro:bit / Arduino guides, the command reference, and the [v2 packet protocol](https://sdk.sphero.com/documentation/api-documents) that BOLT also uses |
+| [edu.sphero.com](https://edu.sphero.com/) (Sphero Central) | All | Lessons, resources and an online program library (programs stored as `.lab` files) |
+| `sphero.docsapp.io` | | The old Edu JavaScript/Python command docs. Not responding as of October 2026 |
 | [sphero-inc/sphero-sdk-raspberrypi-python](https://github.com/sphero-inc/sphero-sdk-raspberrypi-python) | **RVR only** | Official Python SDK. Raspberry Pi talking to RVR over its UART port, not Bluetooth. asyncio and observer flavors; last updated 2024. |
 
 Sphero's GitHub org exists but only covers RVR; there's no first-party

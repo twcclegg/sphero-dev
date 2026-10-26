@@ -104,4 +104,7 @@ or app. Verify before relying on them, and update this file when you do:
 - BOLT+ Bluetooth name prefix and whether spherov2's `BOLT` class fully
   supports it.
 - Any supported way to load code into the Edu app other than typing or
-  pasting it (see [docs/edu-app-code-transfer.md](docs/edu-app-code-transfer.md)).
+  pasting it. Programs are stored as `.lab` files; whether we can generate
+  them is open (see [docs/edu-app-code-transfer.md](docs/edu-app-code-transfer.md)).
+- Where the Edu app's Python command docs live now: `sphero.docsapp.io` no
+  longer responds.

@@ -3,8 +3,10 @@
 You don't need this to write programs. It's here for people building
 libraries (e.g. a TypeScript port) or debugging one.
 
-Sources: Sphero's general API spec (`sdk.sphero.com/docs/api_spec/general_api`)
-as implemented in spherov2.py (`spherov2/controls/v2.py`, `spherov2/toy/`).
+Sources: Sphero's [API protocol page](https://sdk.sphero.com/documentation/api-documents)
+(written for RVR, same packet format) and spherov2.py's implementation
+(`spherov2/controls/v2.py`, `spherov2/toy/`). The BLE UUIDs and the unlock
+string come from spherov2 only.
 
 ## BLE services
 
@@ -46,7 +48,9 @@ with `0xAB` followed by a substitute:
 | `0x8D` (start) | `0xAB 0x05` |
 | `0xD8` (end) | `0xAB 0x50` |
 
-The checksum is computed before escaping. spherov2 writes packets to the
+All multi-byte values are big-endian. The checksum covers every byte
+except SOP and EOP and is computed before escaping (per Sphero's page).
+Each escaped value is the original with bit 0x88 cleared. spherov2 writes packets to the
 characteristic in 20-byte chunks.
 
 ## Example: drive

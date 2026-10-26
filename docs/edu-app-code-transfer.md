@@ -2,10 +2,26 @@
 
 **Status: research notes, nothing implemented or verified yet.**
 
-Research so far was done without access to Sphero's sites
-(`edu.sphero.com`, `sdk.sphero.com`, `sphero.docsapp.io` were unreachable
-from the environment used), so the items below come from general knowledge
-and from spherov2's source, which links `edu.sphero.com/remixes/...` pages.
+## Findings (October 2026)
+
+From the public pages and browser scripts of `edu.sphero.com` (no API calls
+made, nothing signed in):
+
+- `edu.sphero.com` is now **Sphero Central**, a lessons/resources site with
+  a program library: "My Content › Programs", `/program/:id/edit`, sharing
+  and assigning programs to classes. Old `/remixes/...` links redirect to
+  `/programs/`.
+- Programs are saved through a GraphQL `upsertProgram` mutation whose
+  program is an uploaded **`.lab` file** (the upload box accepts only
+  `.lab`). Program records have a `programType` (`block`, `text`, `canvas`
+  seen in the scripts), a `code` field and a `labFile` URL.
+- So **`.lab` is the Edu app's program file format**, and Sphero Central
+  accepts `.lab` uploads. If we can produce a `.lab` file from a `.py` file,
+  programs could reach the app by file instead of copy/paste (option 2b
+  below).
+- `sphero.docsapp.io` (the old Edu JavaScript/Python command docs) doesn't
+  answer any more (bad gateway); the Python command docs now seem to live
+  only inside the app.
 
 Today the workflow is: write code on a computer (often with an AI
 assistant), get the text onto the tablet, paste it into the Edu app's
@@ -16,9 +32,11 @@ editor. This page tracks ways to cut out the manual steps.
 - Sphero Edu programs are tied to a Sphero Edu account and sync between
   devices. A program created on one device appears on others signed into the
   same account.
-- The Edu app also runs in a web browser at `edu.sphero.com` (and as
-  desktop/Chromebook apps), with the same text editor.
-- Programs can be shared and "remixed" by link.
+- Programs can be shared by link and assigned to classes (confirmed by the
+  findings above).
+- `edu.sphero.com` no longer has a code editor: no editor component
+  (Monaco, CodeMirror, Blockly) appears in its scripts. Programs are written
+  in the app and uploaded or shared as `.lab` files.
 
 ## Candidate approaches
 
@@ -26,10 +44,16 @@ Ordered from least to most effort.
 
 1. **Clipboard handoff.** On Apple devices, Universal Clipboard: copy on the
    Mac, paste on the iPad. Zero code. Worth documenting as the default.
-2. **Edit on the web, run on the tablet.** If programs sync, paste into the
-   Edu web editor on the same computer as the code, then open the synced
-   program on the tablet. Needs confirming that text programs sync and how
-   quickly.
+2. **Edit on the web, run on the tablet.** Ruled out: Sphero Central has no
+   code editor any more (see findings). Uploading a `.lab` file (2b) is the
+   web route that's left.
+2b. **Generate a `.lab` file.** Learn the format from a Python program
+   exported from the app, write `sphero-dev export program.py`, then open
+   the file in the app (AirDrop / Files on iPad) or upload it on Sphero
+   Central. Next step: export one Python program from the Edu app as
+   `.lab` and add it to this repo as a sample. Not yet confirmed: that the
+   app can import `.lab` files, and that uploads to Sphero Central show up
+   in the app.
 3. **Browser automation of the web editor.** A script (e.g. Playwright) that
    signs into `edu.sphero.com`, opens a program, and replaces its text with a
    local file. Fragile against UI changes, but needs no private API.
