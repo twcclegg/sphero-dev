@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import math
+import time
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -16,26 +17,67 @@ async def _call_handler(handler: Callable[..., Any], args: tuple) -> None:
         await result
 
 
+class RobotHalted(Exception):
+    """The host stopped the program for safety (see :meth:`RobotBackend.halt`)."""
+
+
 class RobotBackend:
     """Drives a real robot through spherov2's ``SpheroEduAPI``.
 
     ``api`` must already be entered (``with SpheroEduAPI(toy) as api``).
     ``max_speed`` caps every speed the program asks for (0-255).
+
+    Each command waits for the robot's reply, about 0.1 s on a BOLT+ over
+    BLE (measured Oct 2026), and blocks the program meanwhile. So
+    ``set_heading``/``set_speed`` calls that wouldn't change what the robot
+    is doing aren't sent.
     """
 
     def __init__(self, api: Any, max_speed: int = 255):
         self.api = api
         self.max_speed = max_speed
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._heading: int | None = None
+        self._speed: int | None = None
+        self.halted: str | None = None
+
+    def halt(self, reason: str) -> None:
+        """Stop the robot and refuse to drive it again; the program ends at its next wait.
+
+        Safe to call from another thread.
+        """
+        if self.halted is None:
+            self.halted = reason
+            self.api.stop_roll()
 
     def __getattr__(self, name: str) -> Any:
+        if name in ("roll", "spin"):  # these change heading and speed themselves
+            self._heading = self._speed = None
         return getattr(self.api, name)
 
     def _cap(self, speed: int) -> int:
         return max(-self.max_speed, min(self.max_speed, speed))
 
     def set_speed(self, speed: int) -> None:
-        self.api.set_speed(self._cap(speed))
+        if self.halted:
+            return
+        speed = self._cap(speed)
+        if speed != self._speed or self._heading is None:
+            self.api.set_speed(speed)
+            self._speed = speed
+
+    def set_heading(self, heading: int) -> None:
+        if self.halted:
+            return
+        if heading != self._heading or self._speed is None:
+            self.api.set_heading(heading)
+            self._heading = heading
+
+    def stop_roll(self, heading: int | None = None) -> None:
+        self.api.stop_roll(heading)
+        self._speed = 0
+        if heading is not None:
+            self._heading = heading
 
     @staticmethod
     def color(r: int, g: int, b: int) -> Any:
@@ -43,10 +85,18 @@ class RobotBackend:
 
         return Color(r, g, b)
 
+    @staticmethod
+    def now() -> float:
+        return time.monotonic()
+
     async def sleep(self, seconds: float) -> None:
         await asyncio.sleep(seconds)
+        if self.halted:
+            raise RobotHalted(self.halted)
 
     async def raw_motor(self, left: int, right: int, duration: float) -> None:
+        if self.halted:
+            raise RobotHalted(self.halted)
         await asyncio.to_thread(self.api.raw_motor, self._cap(left), self._cap(right), duration)
 
     def register_event(self, name: str, handler: Callable[..., Any]) -> None:
@@ -85,6 +135,11 @@ class SimBackend:
     ``delay`` advances virtual time, so a 60 s program runs in well under a
     second. ``delay_overhead`` adds extra time to every wait, to mimic a host
     (like the Edu app) whose loop runs slower than the delays it's asked for.
+    ``command_latency`` is the time each command to the robot takes (a BOLT+
+    over BLE: about 0.1 s); like ``RobotBackend``, unchanged
+    ``set_heading``/``set_speed`` calls are free.
+    Below ``min_moving_speed`` the robot only creeps (30% of the usual ground
+    speed), like a BOLT+ on hardwood at speeds under about 35.
     ``max_speed`` caps commanded speed, like ``RobotBackend``'s cap.
     ``trace`` holds ``(t, x, y, heading, speed_cm_s)`` samples.
     """
@@ -96,6 +151,8 @@ class SimBackend:
     delay_overhead: float = 0.0
     max_turn_rate: float | None = None
     turn_lag: float = 0.0
+    command_latency: float = 0.0
+    min_moving_speed: int = 0
     max_speed: int = 255
     log: Callable[[str], None] | None = None
 
@@ -112,6 +169,9 @@ class SimBackend:
     _next_sample: float = 0.0
 
     # --- clock ---------------------------------------------------------
+    def now(self) -> float:
+        return self.t
+
     async def sleep(self, seconds: float) -> None:
         end = self.t + max(0.0, seconds) + self.delay_overhead
         if self._limit is not None:
@@ -133,6 +193,8 @@ class SimBackend:
 
     def _step(self, dt: float) -> None:
         target = self.cm_per_unit * self.speed
+        if abs(self.speed) < self.min_moving_speed:
+            target *= 0.3
         self.v += (target - self.v) * min(1.0, dt / self.tau)
         diff = (self.heading - self.actual_heading + 180) % 360 - 180
         turn = diff if self.turn_lag <= 0 else diff * min(1.0, dt / self.turn_lag)
@@ -150,6 +212,14 @@ class SimBackend:
                                self.v))
             self._next_sample += self.sample_every
 
+    def _spend(self) -> None:
+        """Advance the clock by one command's round trip (capped at the run's limit)."""
+        end = self.t + self.command_latency
+        if self._limit is not None:
+            end = min(end, self._limit)
+        while self.t < end - 1e-9:
+            self._step(min(self.dt, end - self.t))
+
     def _say(self, msg: str) -> None:
         if self.log:
             self.log(f"[{self.t:7.2f}s] {msg}")
@@ -160,13 +230,19 @@ class SimBackend:
         return (r, g, b)
 
     def set_speed(self, speed: int) -> None:
-        self.speed = max(-self.max_speed, min(self.max_speed, speed))
+        speed = max(-self.max_speed, min(self.max_speed, speed))
+        if speed != self.speed:
+            self._spend()
+        self.speed = speed
         self._say(f"set_speed({self.speed})")
 
     def set_heading(self, heading: int) -> None:
+        if heading % 360 != self.heading:
+            self._spend()
         self.heading = heading % 360
 
     def stop_roll(self, heading: int | None = None) -> None:
+        self._spend()
         if heading is not None:
             self.heading = heading % 360
         self.speed = 0
@@ -204,6 +280,8 @@ class SimBackend:
             raise AttributeError(name)
 
         def noop(*args: Any) -> None:
+            if not name.startswith("get_"):
+                self._spend()
             self._say(f"{name}{args}")
 
         return noop

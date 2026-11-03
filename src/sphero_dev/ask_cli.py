@@ -46,23 +46,48 @@ def _save(p: Proposal, out_dir: Path) -> None:
     print(f"Saved {py} and {dot_lab} (import the .lab in the Sphero Edu app).")
 
 
+class _NoSDK:
+    """Stands in for the ``anthropic`` module when using the Claude Code CLI without it."""
+
+    class _Never(Exception):
+        pass
+
+    AuthenticationError = RateLimitError = APIStatusError = APIConnectionError = _Never
+
+
 def ask_main(args: argparse.Namespace) -> int:
-    try:
-        import anthropic
-    except ImportError:
-        print("sphero-dev ask needs the Anthropic SDK (Python 3.10+):\n"
-              "  pip install 'sphero-dev[ai]'", file=sys.stderr)
-        return 1
+    from . import claude_code
     from .cli import run_on_robot
 
-    try:
-        client = anthropic.Anthropic()
-    except anthropic.AnthropicError as e:
-        print(f"Couldn't set up the Anthropic client: {e}\n"
-              "Set ANTHROPIC_API_KEY (from console.anthropic.com).", file=sys.stderr)
-        return 1
+    via = args.via
+    if via == "auto":
+        via = "claude-code" if claude_code.available() else "api"
+    if via == "claude-code":
+        if not claude_code.available():
+            print("--via claude-code needs the `claude` CLI on PATH, logged in.",
+                  file=sys.stderr)
+            return 1
+        try:
+            import anthropic
+        except ImportError:
+            anthropic = _NoSDK
+        client = claude_code.ClaudeCodeClient()
+        _dim(f"Using your Claude subscription through the claude CLI ({args.model}).")
+    else:
+        try:
+            import anthropic
+        except ImportError:
+            print("sphero-dev ask needs the Anthropic SDK (Python 3.10+):\n"
+                  "  pip install 'sphero-dev[ai]'", file=sys.stderr)
+            return 1
+        try:
+            client = anthropic.Anthropic()
+        except anthropic.AnthropicError as e:
+            print(f"Couldn't set up the Anthropic client: {e}\n"
+                  "Set ANTHROPIC_API_KEY (from console.anthropic.com).", file=sys.stderr)
+            return 1
     convo = Conversation(client, max_speed=args.max_speed, seconds=args.seconds,
-                         effort=args.effort, status=_dim)
+                         effort=args.effort, model=args.model, status=_dim)
 
     message = " ".join(args.request) or _input("What should the robot do? ")
     while message:
@@ -102,23 +127,27 @@ def ask_main(args: argparse.Namespace) -> int:
 
         proposal = reply.proposal
         _show(proposal)
-        ran = False
+        outcome = None
         while True:
             choice = _input(MENU)
             if choice.lower() in ("", "q", "quit"):
                 return 0
             if choice.lower() in ("r", "run"):
                 try:
-                    run_on_robot(proposal.code, args.robot, args.seconds, args.max_speed,
-                                 f"{_slug(proposal.title)}.py")
+                    outcome = run_on_robot(proposal.code, args.robot, args.seconds,
+                                           args.max_speed, f"{_slug(proposal.title)}.py")
                 except Exception as e:  # no robot found, Bluetooth off, ...
-                    print(f"Couldn't run it on the robot: {e}")
+                    print(f"Couldn't run it on the robot: {type(e).__name__}: {e}")
                     continue
-                ran = True
-                print("Done. Tell me how it went to improve it, or choose again.")
+                print(outcome.summary)
+                _dim(outcome.details)
+                print("If it didn't do what you wanted, type what went wrong and Claude "
+                      "will revise the program.")
             elif choice.lower() in ("s", "save"):
                 _save(proposal, Path(args.out_dir))
             else:
-                message = f"I ran it on the real robot. {choice}" if ran else choice
+                message = (f"I ran it on the real robot. {outcome.summary}\n{outcome.details}\n\n"
+                           f"{choice}" if outcome
+                           else choice)
                 break
     return 0

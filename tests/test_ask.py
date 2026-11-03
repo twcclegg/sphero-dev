@@ -59,7 +59,7 @@ def test_simulate_then_propose_returns_proposal():
     assert "Travelled" in reply.proposal.sim_report
 
     first = client.requests[0]
-    assert first["model"] == "claude-opus-5-5"
+    assert first["model"] == "claude-sonnet-5-5"
     assert first["thinking"] == {"type": "adaptive"}
     assert first["fallbacks"] == "default"
     assert "speed is capped at 255" in first["messages"][0]["content"][-1]["text"]
@@ -138,6 +138,18 @@ def test_cli_saves_and_quits(monkeypatch, tmp_path):
     monkeypatch.setattr(anthropic, "Anthropic", lambda: client)
     answers = iter(["s", "q"])
     monkeypatch.setattr(ask_cli, "_input", lambda prompt: next(answers))
-    assert main(["ask", "drive", "forward", "-o", str(tmp_path)]) == 0
+    assert main(["ask", "drive", "forward", "--via", "api", "-o", str(tmp_path)]) == 0
     assert (tmp_path / "forward.py").read_text() == GOOD
     assert (tmp_path / "forward.lab").exists()
+
+
+def test_proposal_that_never_moves_goes_back_to_claude():
+    stuck = "async def start_program():\n    set_speed(0)\n    await delay(1)\n"
+    client = FakeClient(
+        msg(tool("propose_program", title="Nothing", summary="s", code=stuck)),
+        msg(tool("propose_program", title="Forward", summary="s", code=GOOD)),
+    )
+    reply = convo(client).send("drive forward")
+    assert reply.proposal.title == "Forward"
+    result = client.requests[1]["messages"][-1]["content"][0]
+    assert result["is_error"] and "never moved" in result["content"]

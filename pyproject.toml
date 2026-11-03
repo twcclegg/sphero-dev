@@ -32,6 +32,7 @@ packages = ["src/sphero_dev"]
 # `sphero-dev ask` puts the command reference in Claude's system prompt.
 [tool.hatch.build.targets.wheel.force-include]
 "docs/api-reference.md" = "sphero_dev/api-reference.md"
+"examples/edu_app/square.py" = "sphero_dev/example_square.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

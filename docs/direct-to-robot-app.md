@@ -51,7 +51,7 @@ import anthropic
 
 client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY
 response = client.beta.messages.create(
-    model="claude-opus-5-5",
+    model="claude-sonnet-5-5",
     max_tokens=16000,
     thinking={"type": "adaptive"},
     output_config={"effort": "medium"},

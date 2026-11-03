@@ -26,12 +26,14 @@ from importlib import resources
 from pathlib import Path
 from typing import Any, Callable
 
-MODEL = "claude-opus-5-5"
+MODEL = "claude-sonnet-5-5"
 MAX_TOOL_ROUNDS = 12
 SIM_WALL_CLOCK_S = 20.0
 
 # What the simulator assumes, matched to a real BOLT+ run (see AGENTS.md).
-SIM_SETTINGS = {"delay_overhead": 0.1, "turn_lag": 0.2}
+# tau 0.45: from rest at speed 50 it barely moves for ~0.5 s and is at speed by ~0.9 s.
+SIM_SETTINGS = {"delay_overhead": 0.1, "turn_lag": 0.2, "command_latency": 0.1, "tau": 0.45,
+                "min_moving_speed": 35}
 
 RULES = """\
 You write programs for a Sphero BOLT or BOLT+ robot in the Sphero Edu app's \
@@ -72,8 +74,26 @@ least 82 deg/s at 60 cm/s but tight high-speed turns slip. For tight \
 paths adapt speed to tracking error rather than picking a fast fixed speed. \
 A path-follower that relies on hitting the commanded heading exactly sits \
 off the path; an integral correction fixes that.
+- Each command sent to the robot (set_speed, set_heading, stop_roll, \
+lights, matrix) takes about 0.1 s and the program waits for it; reading \
+a sensor is instant. A set_heading or set_speed that changes nothing is \
+free. In loops, only change what needs changing.
+- `roll(heading, speed, duration)` stops the robot when its time is up. \
+To drive continuously while steering, use set_heading() and set_speed() \
+with `await delay(...)` in the loop, and stop_roll() at the end. Don't \
+call roll() in a loop of short steps: the robot stops and restarts every \
+step, and from a stop it takes about 0.5-1 s to get going again (longer \
+if it first has to turn on the spot).
+- Sensor readings update about 6 times a second.
+- Below about speed 35 a BOLT+ barely moves on a hard floor (a few cm/s). \
+Don't creep slower than 40 near a target; stop early and let it coast.
 - Rooms are small. Unless asked otherwise, keep the path within about \
 1.5 m of the start.
+- Location comes from the wheels. On a soft surface (a bed, thick carpet) \
+or against an obstacle the wheels spin inside the shell and the robot \
+barely moves, so a loop waiting to reach a point may never finish. Give \
+every "drive until" loop a time limit (count loop passes) and move on when \
+it runs out.
 
 # How to work
 
@@ -147,8 +167,12 @@ def _read_text(package_file: str, repo_fallback: str) -> str:
 def system_prompt() -> str:
     stubs = _read_text("edu_builtins.pyi", "src/sphero_dev/edu_builtins.pyi")
     reference = _read_text("api-reference.md", "docs/api-reference.md")
+    example = _read_text("example_square.py", "examples/edu_app/square.py")
     return (f"{RULES}\n# Built-in commands (type stubs)\n\n```python\n{stubs}```\n\n"
-            f"# Command reference\n\n{reference}")
+            f"# Command reference\n\n{reference}\n\n"
+            "# A program that worked on a real BOLT+\n\n"
+            "Use its drive-to-a-point pattern when a path has corners or targets.\n\n"
+            f"```python\n{example}```\n")
 
 
 # --- simulator tool ---------------------------------------------------------
@@ -157,6 +181,7 @@ def system_prompt() -> str:
 class SimResult:
     ok: bool
     report: str
+    distance: float = 0.0
 
 
 def _sim_worker(code: str, seconds: float, max_speed: int, out: Any) -> None:
@@ -260,7 +285,7 @@ def simulate(code: str, seconds: float, max_speed: int = 255) -> SimResult:
         return SimResult(False, "ERROR: the simulation hung. A loop probably has no `await`; "
                                 "every loop needs one (e.g. `await delay(0.05)`).")
     proc.join()
-    return SimResult(result["error"] is None, _summarize(result, seconds))
+    return SimResult(result["error"] is None, _summarize(result, seconds), result["distance"])
 
 
 # --- conversation -----------------------------------------------------------
@@ -349,6 +374,10 @@ class Conversation:
         )
 
     def _run_tool(self, name: str, args: dict[str, Any]) -> tuple[str, bool, Proposal | None]:
+        needed = {"simulate": ["code"], "propose_program": ["title", "summary", "code"]}
+        missing = [k for k in needed.get(name, []) if not args.get(k)]
+        if missing:
+            return f"{name} needs {', '.join(missing)}.", True, None
         if name == "simulate":
             self.status(f"  simulating {args.get('seconds', self.seconds)} s...")
             result = simulate(args["code"], args.get("seconds", self.seconds), self.max_speed)
@@ -359,6 +388,9 @@ class Conversation:
             if not result.ok:
                 return f"Not shown to the user; it failed in the simulator:\n{result.report}", \
                     True, None
+            if result.distance < 1 and re.search(r"\b(roll|set_speed|raw_motor)\(", args["code"]):
+                return ("Not shown to the user: it sends drive commands but the robot never "
+                        f"moved in the simulator. Fix that first.\n{result.report}"), True, None
             proposal = Proposal(args["title"], args["summary"], args["code"], result.report)
             return "Shown to the user, who decides whether to run it.", False, proposal
         return f"Unknown tool {name!r}.", True, None

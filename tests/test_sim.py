@@ -25,8 +25,20 @@ def run_sim(tmp_path):
 @pytest.mark.parametrize("path", EDU_EXAMPLES, ids=lambda p: p.name)
 def test_edu_examples_run_in_sim(path):
     sim = SimBackend()
-    asyncio.run(run_program(path, sim, 15.0))
-    assert sim.t == pytest.approx(15.0, abs=0.05)
+    asyncio.run(run_program(path, sim, 15.0))  # runs without errors, finished or not
+    assert 0 < sim.t <= 15.05
+
+
+def test_square_example_closes():
+    from sphero_dev.ask import SIM_SETTINGS
+
+    sim = SimBackend(**SIM_SETTINGS)
+    asyncio.run(run_program(ROOT / "examples" / "edu_app" / "square.py", sim, 30.0))
+    xs = [p[1] for p in sim.trace]
+    ys = [p[2] for p in sim.trace]
+    assert sim.t < 15  # finished by itself
+    assert math.hypot(sim.x, sim.y) < 5
+    assert 25 < max(xs) < 40 and 25 < max(ys) < 40
 
 
 @pytest.mark.parametrize("clockwise", [True, False])
@@ -131,3 +143,35 @@ def test_sim_reproduces_real_bolt_plus_run_of_circles_v3():
     speed = sum(p[4] for p in pts) / len(pts)
     assert radius == pytest.approx(real_radius, abs=2)
     assert speed == pytest.approx(36, abs=8)
+
+
+def test_command_latency_charges_only_real_commands():
+    from sphero_dev.backends import SimBackend
+
+    sim = SimBackend(command_latency=0.1)
+    sim.set_speed(50)
+    sim.set_speed(50)  # unchanged: free
+    sim.set_heading(0)  # unchanged: free
+    sim.set_main_led((0, 0, 0))
+    sim.get_acceleration()
+    assert abs(sim.t - 0.2) < 1e-6
+
+
+def test_low_speeds_only_creep():
+    from sphero_dev.backends import SimBackend
+
+    slow, normal = SimBackend(min_moving_speed=35), SimBackend()
+    for sim in (slow, normal):
+        sim.set_speed(25)
+        asyncio.run(sim.sleep(2))
+    assert slow.distance < 0.4 * normal.distance
+
+
+def test_spin_takes_its_duration_despite_slow_commands():
+    from sphero_dev.edu import run_source
+
+    sim = SimBackend(command_latency=0.1)
+    source = "async def start_program():\n    await spin(720, 4)\n"
+    asyncio.run(run_source(source, sim, 30.0))
+    assert sim.t == pytest.approx(4.0, abs=0.35)  # + the last command and stop_roll; was ~24 s
+    assert sim.heading == 0

@@ -62,8 +62,12 @@ the user has before writing code. A screenshot of a code editor with **Start**,
   BOLT names start with `SB-`. **BOLT+ names start with `BP-`** (seen on a
   real BOLT+), which spherov2 doesn't recognize at all, even by exact name.
   Add a `BOLTPlus` type (`sphero_dev.toys.BOLTPlus`, or the few lines in
-  `examples/desktop/circles.py`) to `toy_types`. Whether every BOLT command
-  works on a BOLT+ from spherov2 isn't tested yet.
+  `examples/desktop/circles.py`) to `toy_types`. A BOLT+ differs from a
+  BOLT in two ways spherov2 trips over (seen on BP-5FBB, Oct 2026): it has
+  no anti-DoS characteristic, so the `usetheforce...band` unlock fails with
+  "Characteristic 00020005-... was not found", and it answers driving,
+  sensor and matrix commands on processor `0x11` only (BOLT's `0x12` gives
+  error 9, bad target ID). `sphero_dev.toys.BOLTPlus` handles both.
 - Template: [`examples/desktop/circles.py`](examples/desktop/circles.py).
 
 ## Libraries to avoid
@@ -99,6 +103,17 @@ See [docs/ecosystem.md](docs/ecosystem.md).
   reproduces this with `--turn-lag 0.2`). Steering that relies on hitting
   the commanded heading exactly needs an integral term; see
   `examples/edu_app/circles.py`.
+- **Measured on a BOLT+ from desktop Python (spherov2, hardwood, Oct
+  2026):** every command (drive, LEDs) takes about 0.1 s round trip and
+  blocks the program; sensor reads are instant. From a stop it barely moves
+  for ~0.5 s and is at speed by ~0.9 s (simulator `tau` 0.45). Below about
+  speed 35 it hardly moves at all. `roll(h, s, d)` stops at the end, so a
+  loop of short `roll`s stop-starts and covers little ground; drive with
+  `set_heading`/`set_speed` instead (see `examples/edu_app/square.py`,
+  which ran on the robot). spherov2 streams sensors every 250 ms by
+  default (`sphero-dev run` sets 150 ms, like the app), and they read
+  `None` until the first sample arrives. A BOLT+ goes to sleep about a
+  minute after its last connection ends.
 - Tight turns have a speed limit: a fixed speed 170 on a 50 cm radius drew
   wandering 1.5-2 m loops. For tight paths, adapt speed to tracking error
   rather than picking a fixed speed.
@@ -107,6 +122,11 @@ See [docs/ecosystem.md](docs/ecosystem.md).
   Velocity, Distance, Gyroscope, Orientation, Accelerometer, Ambient Light;
   about 6.7 samples/s). Ask the user for the CSVs, or a screenshot of the
   chart; they're the best way to see what a driving program really did.
+- **Drive on a hard floor.** On a bed a BOLT+ spins its wheels inside the
+  shell and barely moves (seen Oct 2026). Location comes from the wheels,
+  so it read about 80 cm travelled for a few cm of real motion, and a
+  program waiting to reach a corner never finished. Give every "drive
+  until" loop a time limit.
 - Sharp high-speed turns slip. If a path comes out larger than asked, lower
   the speed before tweaking the math.
 
@@ -146,8 +166,8 @@ or app. Verify before relying on them, and update this file when you do:
   `await delay(...)` works; `set_speed`, `set_heading`, `set_main_led`,
   `set_back_led`, `get_velocity` work without `await`.
 - Whether the Edu app's Python allows any imports (`math`, `random`).
-- Whether spherov2's BOLT commands fully work on a BOLT+ (name prefix is
-  `BP-`, confirmed).
+- Whether the rest of spherov2's BOLT commands work on a BOLT+. Driving,
+  LEDs and sensor streaming do (Oct 2026); the matrix/LCD is untested.
 - The BOLT+'s actual top turn rate at each speed (≥82°/s at ~60 cm/s seen).
 - Where the Edu app's Python command docs live now: `sphero.docsapp.io` no
   longer responds.

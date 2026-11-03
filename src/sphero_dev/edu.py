@@ -98,20 +98,30 @@ def build_globals(backend: Any) -> dict[str, Any]:
         await backend.sleep(float(duration))
         backend.stop_roll(None)
 
+    async def _over(duration: float, step: float, update: Callable[[float], None]) -> None:
+        """Call ``update(fraction)`` until ``duration`` has passed, ending with 1.0.
+
+        Paced by the backend's clock, not by counting steps: each command to a
+        real robot takes ~0.1 s, so a fixed number of steps runs long.
+        """
+        end = backend.now() + duration
+        while True:
+            left = end - backend.now()
+            frac = 1.0 if left <= 1e-6 else 1.0 - left / duration
+            update(frac)
+            if frac >= 1.0:
+                return
+            await backend.sleep(min(step, left))
+
     async def spin(angle: float, duration: float) -> None:
         start = backend.get_heading()
-        steps = max(1, round(duration / SPIN_STEP_S))
-        for i in range(1, steps + 1):
-            backend.set_heading(round(start + angle * i / steps) % 360)
-            await backend.sleep(duration / steps)
+        await _over(float(duration), SPIN_STEP_S,
+                    lambda f: backend.set_heading(round(start + angle * f) % 360))
 
     async def fade(from_color: Any, to_color: Any, duration: float) -> None:
         a, b = to_rgb(from_color), to_rgb(to_color)
-        steps = max(1, round(duration / 0.05))
-        for i in range(steps + 1):
-            t = i / steps
-            set_main_led(tuple(round(x + (y - x) * t) for x, y in zip(a, b)))
-            await backend.sleep(duration / steps)
+        await _over(float(duration), 0.05, lambda f: set_main_led(
+            tuple(round(x + (y - x) * f) for x, y in zip(a, b))))
 
     async def strobe(color: Any, period: float, count: int) -> None:
         for _ in range(int(count)):

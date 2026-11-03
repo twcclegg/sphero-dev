@@ -23,7 +23,10 @@ import math
 import sys
 import time
 
+from functools import partialmethod
+
 from spherov2 import scanner
+from spherov2.controls.v2 import Processors
 from spherov2.sphero_edu import SpheroEduAPI
 from spherov2.toy.bolt import BOLT
 from spherov2.types import Color, ToyType
@@ -32,7 +35,15 @@ from spherov2.types import Color, ToyType
 class BOLTPlus(BOLT):
     # spherov2 only recognizes BOLTs named SB-...; a BOLT+ advertises as BP-...
     toy_type = ToyType("Sphero BOLT+", "BP-", "BP", 0.075)
+    # A BOLT+ has no "usetheforce...band" unlock characteristic.
+    _handshake = []
 
+
+# A BOLT+ rejects commands sent to BOLT's second processor (0x12); send them to 0x11.
+for _name, _method in vars(BOLT).items():
+    if isinstance(_method, partialmethod) and _method.keywords.get("proc") == Processors.SECONDARY:
+        setattr(BOLTPlus, _name, partialmethod(_method.func, *_method.args,
+                                               **{**_method.keywords, "proc": Processors.PRIMARY}))
 
 
 DIAMETER_CM = 100.0

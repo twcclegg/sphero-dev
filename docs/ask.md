@@ -1,8 +1,11 @@
 # `sphero-dev ask`: describe it, Claude writes it, the robot runs it
 
-**Status: first version, Oct 2026.** The conversation loop and simulator
-checks are tested against a scripted fake of the Claude API. It has **not
-yet been run against the real API or a robot**.
+**Status, Oct 2026:** run end to end on a BOLT+ (BP-5FBB) from Linux:
+Claude (Sonnet, through a Claude subscription) wrote square, triangle and
+figure-eight programs, and the 30 cm square ran on the robot as simulated
+(corners within a few cm, back within 2 cm of the start, 7.7 s against 7.9 s
+simulated). The conversation loop is also tested against scripted fakes of
+the API and of `claude -p`.
 
 ```text
 $ sphero-dev ask "drive a figure eight about a meter long, blue on the left loop, red on the right" --robot BP-5FBB
@@ -43,9 +46,15 @@ Python 3.10+.
 git clone https://github.com/twcclegg/sphero-dev && cd sphero-dev
 python3 -m venv .venv && . .venv/bin/activate
 pip install -e '.[ai]'
-export ANTHROPIC_API_KEY=sk-ant-...   # from console.anthropic.com
 sphero-dev ask "drive a square, 50 cm a side"
 ```
+
+**Which Claude account pays.** If the [Claude Code](https://claude.com/claude-code)
+CLI (`claude`) is installed and logged in, `ask` uses it (`claude -p`), and
+the requests count against that Claude subscription. `ANTHROPIC_API_KEY` is
+removed from its environment so it can't bill an API key by mistake.
+Otherwise, or with `--via api`, it calls the API with `ANTHROPIC_API_KEY`
+(from console.anthropic.com) and needs `pip install -e '.[ai]'`.
 
 - **Linux:** needs BlueZ, which Mint ships with Bluetooth turned on. No
   root needed.
@@ -64,12 +73,14 @@ sphero-dev ask "drive a square, 50 cm a side"
 | `--robot NAME` | first robot found | e.g. `BP-5FBB` (BOLT+ names start `BP-`, BOLT `SB-`) |
 | `--seconds N` | 30 | every run on the robot stops after this |
 | `--max-speed N` | 150 | hard cap, 0-255, enforced by the backend whatever the program asks; Claude is told about it too |
+| `--model` | `claude-sonnet-5-5` | `claude-haiku-5-5` is faster and cheaper |
+| `--via` | `auto` | `claude-code` (subscription, through `claude -p`), `api` (`ANTHROPIC_API_KEY`), or `auto`: `claude-code` when `claude` is on PATH |
 | `--effort` | medium | Claude's reasoning effort: `low` is faster and cheaper, `high` is for tricky paths |
 | `-o DIR` | `.` | where **s** saves |
 
 ## How it works
 
-1. Your request goes to Claude (`claude-opus-5-5`, adaptive thinking). The
+1. Your request goes to Claude (`claude-sonnet-5-5` by default). The
    system prompt holds:
    - the Edu-app dialect rules and measured BOLT+ facts from
      [AGENTS.md](../AGENTS.md);
@@ -94,6 +105,16 @@ anything it writes also pastes into the app.
 - Nothing runs on the robot without you choosing **r**.
 - Speed is capped in the backend (`--max-speed`), not only by asking Claude.
 - Each run stops after `--seconds`, and Ctrl-C stops the robot at once.
+- While a program runs, a watchdog checks the robot's data. If packets
+  arrive garbled or sensor samples stop for a second, it stops the robot
+  and ends the program, rather than let it drive blind. (This happened
+  once, after a retried connection: the location read (0, 0) while the
+  robot drove into furniture.)
+- After a run you see what the robot's sensors measured: time, distance,
+  where it ended, and when it seemed stuck. If you type a change, Claude
+  gets the measured path too.
+- Clear the floor. Location comes from the wheels, so bumps and soft
+  surfaces (a bed, thick carpet) make it wrong.
 - Programs run as ordinary Python on your computer, with the shim's globals.
   The dialect check blocks imports, but this is **not a sandbox**. Read what
   you're about to run, as you would any code.

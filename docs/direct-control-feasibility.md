@@ -43,10 +43,12 @@ the wire protocol is mostly shared too, but **it doesn't prove it**.
 
 | Feature | spherov2 call | Result |
 |---|---|---|
-| Find and connect | `find_toy(toy_name="BP-…", toy_types=[BOLTPlus])` | untested |
-| Drive and heading | `api.roll`, `api.set_heading` | untested |
+| Find and connect | `find_toy(toy_name="BP-…", toy_types=[BOLTPlus])` | **works** (Linux, bleak 3.0.2, Oct 2026) once `BOLTPlus` skips the unlock: the BOLT+ has no anti-DoS service, only `00010001-…` |
+| Processor targets | — | BOLT's second processor `0x12` answers every command with error 9 (bad target ID); `0x11` accepts them, so `BOLTPlus` sends everything there |
+| Main LED | `api.set_main_led` | accepted (error 0); not yet confirmed by eye |
+| Drive and heading | `api.roll`, `api.set_heading` | **works** (after the processor fix). About 0.1 s per command |
 | Main and back LEDs | `api.set_main_led`, `api.set_back_led` | untested |
-| Location, velocity, heading streaming | `api.get_location()`, `get_velocity()` | untested |
+| Location, velocity, heading streaming | `api.get_location()`, `get_velocity()` | **works** (after the processor fix) |
 | Matrix / LCD | `api.set_matrix_character`, `set_matrix_pixel` | untested; LCD expected to differ |
 | Battery | `Power.get_battery_voltage` | untested |
 | Collision event | `api.register_event(EventType.on_collision, …)` | untested |
