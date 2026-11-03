@@ -197,10 +197,12 @@ class RobotRun:
 
 def run_on_robot(source: str, robot: str | None, seconds: float | None,
                  max_speed: int = 255, filename: str = "<program>",
-                 stop: threading.Event | None = None) -> RobotRun:
+                 stop: threading.Event | None = None, adapter: Any = None) -> RobotRun:
     """Find a robot, connect, and run an Edu-app program on it.
 
     Ctrl-C stops it, and so does setting ``stop`` (from another thread).
+    ``adapter`` is a spherov2 Bluetooth adapter class (default: bleak's; the
+    iOS app passes :class:`~sphero_dev.ios_adapter.IOSAdapter`).
     """
     from spherov2 import scanner
     from spherov2.sphero_edu import SpheroEduAPI
@@ -210,8 +212,8 @@ def run_on_robot(source: str, robot: str | None, seconds: float | None,
     def find() -> Any:
         print(f"Scanning for {robot or 'a robot'}...")
         try:
-            toy = scanner.find_toy(toy_name=robot,
-                                   toy_types=[*scanner.all_toys(), BOLTPlus], timeout=10)
+            toy = scanner.find_toy(toy_name=robot, toy_types=[*scanner.all_toys(), BOLTPlus],
+                                   timeout=10, adapter=adapter)
         except scanner.ToyNotFoundError:
             # A BOLT+ sleeps about a minute after it was last connected.
             raise RuntimeError(f"No robot{' named ' + robot if robot else ''} found. Wake it "
@@ -351,32 +353,7 @@ def main(argv: list[str] | None = None) -> int:
                           "installed (default)")
     ask.add_argument("-o", "--out-dir", default=".", help="where [s]ave writes files")
 
-    serve = sub.add_parser("serve", help="HTTP API for the iPad app (ios/): Claude, the "
-                                         "simulator and the robot, driven from a phone or tablet")
-    serve.add_argument("--host", default="0.0.0.0",
-                       help="address to listen on (default: all, so the iPad can reach it)")
-    serve.add_argument("--port", type=int, default=8765, help="(default: 8765)")
-    serve.add_argument("--cert", metavar="PEM", help="TLS certificate chain; with --key, serve "
-                                                     "HTTPS (reloaded when the file changes)")
-    serve.add_argument("--key", metavar="PEM", help="TLS private key")
-    serve.add_argument("--name", metavar="HOST", help="the name the certificate is for, e.g. "
-                                                      "sphero.clegg.dev (only for the printout)")
-    serve.add_argument("--robot", metavar="NAME", help="robot name (default: first found)")
-    serve.add_argument("--seconds", type=float, default=30.0,
-                       help="stop each run after this long (default: 30)")
-    serve.add_argument("--max-speed", type=int, default=150, metavar="N",
-                       help="cap on speed, 0-255 (default: 150)")
-    serve.add_argument("--space", type=float, metavar="CM",
-                       help="clear floor around the start, in cm (default: not stated)")
-    serve.add_argument("--effort", default="medium", choices=["low", "medium", "high", "xhigh"])
-    serve.add_argument("--model", default="claude-sonnet-5-5")
-    serve.add_argument("--via", default="auto", choices=["auto", "claude-code", "api"])
-
     args = parser.parse_args(argv)
-    if args.command == "serve":
-        from .serve import serve_main
-
-        return serve_main(args)
     if args.command == "ask":
         from .ask_cli import ask_main
 

@@ -1,7 +1,6 @@
 import Foundation
 
-/// One bubble in the chat. Mirrors the messages `sphero-dev serve` returns
-/// (see `src/sphero_dev/serve.py`); `id` and `date` are added on this side.
+/// One bubble in the chat: a list of parts (text, code, chart, table).
 public struct ChatMessage: Codable, Identifiable, Equatable, Sendable {
     public enum Role: String, Codable, Sendable {
         case user, assistant, status, error
@@ -151,27 +150,9 @@ public enum Part: Codable, Equatable, Sendable {
     }
 }
 
-public struct ChatResponse: Codable, Sendable {
-    public var conversation: String
-    public var messages: [ChatMessage]
-}
-
-public struct MessagesResponse: Codable, Sendable {
-    public var messages: [ChatMessage]
-}
-
-public struct Health: Codable, Equatable, Sendable {
-    public var ok: Bool
-    public var robot: String?
-    public var seconds: Double
-    public var maxSpeed: Int
-    public var spaceCm: Double?
-    public var model: String
-}
-
 extension JSONDecoder {
-    /// Decodes the server's snake_case JSON.
-    public static var server: JSONDecoder {
+    /// Decodes snake_case JSON (x_label -> xLabel).
+    public static var snakeCase: JSONDecoder {
         let d = JSONDecoder()
         d.keyDecodingStrategy = .convertFromSnakeCase
         return d

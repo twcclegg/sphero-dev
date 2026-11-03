@@ -40,6 +40,8 @@ final class HighlighterTests: XCTestCase {
 }
 
 final class ModelTests: XCTestCase {
+    struct Messages: Decodable { var messages: [ChatMessage] }
+
     func testDecodesServerMessages() throws {
         let json = """
         {"conversation": "abc", "messages": [
@@ -54,8 +56,7 @@ final class ModelTests: XCTestCase {
           ]}
         ]}
         """
-        let r = try JSONDecoder.server.decode(ChatResponse.self, from: Data(json.utf8))
-        XCTAssertEqual(r.conversation, "abc")
+        let r = try JSONDecoder.snakeCase.decode(Messages.self, from: Data(json.utf8))
         XCTAssertEqual(r.messages[0].role, .status)
         let parts = r.messages[1].parts
         XCTAssertEqual(parts[1], .code(CodePart(language: "python", title: "Square", code: "pass")))
@@ -79,17 +80,6 @@ final class ModelTests: XCTestCase {
         let data = try JSONEncoder().encode([m])
         XCTAssertEqual(try JSONDecoder().decode([ChatMessage].self, from: data), [m])
     }
-
-    func testServerAddress() {
-        XCTAssertEqual(SpheroServer(address: "sphero.clegg.dev", token: "t")?.baseURL
-                        .absoluteString, "https://sphero.clegg.dev:8765")
-        XCTAssertEqual(SpheroServer(address: "http://192.168.1.20", token: "t")?.baseURL
-                        .absoluteString, "http://192.168.1.20:8765")
-        XCTAssertEqual(SpheroServer(address: "http://laptop.local:9000", token: "t")?.baseURL
-                        .absoluteString, "http://laptop.local:9000")
-        XCTAssertEqual(SpheroServer(address: "192.168.1.20", token: " t ")?.token, "t")
-        XCTAssertNil(SpheroServer(address: "  ", token: "t"))
-    }
 }
 
 final class MarkdownTests: XCTestCase {
@@ -102,30 +92,3 @@ final class MarkdownTests: XCTestCase {
     }
 }
 
-/// Against a running `sphero-dev serve` whose Claude proposes a program on the first
-/// message (see `tests/serve_fixture.py`). Skipped unless SPHERO_TEST_SERVER is set.
-final class LiveServerTests: XCTestCase {
-    func testChatRunAndExport() async throws {
-        let env = ProcessInfo.processInfo.environment
-        guard let address = env["SPHERO_TEST_SERVER"], let token = env["SPHERO_TEST_TOKEN"] else {
-            throw XCTSkip("SPHERO_TEST_SERVER not set")
-        }
-        let server = try XCTUnwrap(SpheroServer(address: address, token: token))
-        let health = try await server.health()
-        XCTAssertTrue(health.ok)
-        do {
-            _ = try await SpheroServer(address: address, token: "wrong")!.health()
-            XCTFail("wrong token accepted")
-        } catch let e as ServerError {
-            XCTAssertEqual(e.status, 401)
-        }
-        let reply = try await server.chat(conversation: nil, text: "drive forward")
-        XCTAssertNotNil(reply.messages.last?.code)
-        let run = try await server.run(conversation: reply.conversation)
-        XCTAssertTrue(run[0].parts.contains { if case .table = $0 { return true }; return false })
-        let (name, data) = try await server.programLab(conversation: reply.conversation)
-        XCTAssertEqual(name, "forward.lab")
-        XCTAssertFalse(data.isEmpty)
-        try await server.stop()
-    }
-}

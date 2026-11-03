@@ -20,10 +20,14 @@ import io
 import multiprocessing
 import queue
 import re
+import sys
+import threading
+import time
 import traceback
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Callable
 
 MODEL = "claude-sonnet-5-5"
@@ -269,12 +273,61 @@ def check_dialect(code: str) -> str | None:
     return None
 
 
+HUNG = ("ERROR: the simulation hung. A loop probably has no `await`; "
+        "every loop needs one (e.g. `await delay(0.05)`).")
+
+# iOS apps can't start processes, so there the simulation runs in a thread with a
+# watchdog instead (see _simulate_in_thread).
+SIM_IN_THREAD = sys.platform == "ios"
+
+
+class _SimTimeout(BaseException):
+    """Raised inside the program by the watchdog; BaseException so `except Exception`
+    in the program can't swallow it."""
+
+
+def _simulate_in_thread(code: str, seconds: float, max_speed: int) -> SimResult:
+    """Like the child process, but stop a runaway program by tracing its lines.
+
+    Only the program's own frames (``<program>``) are traced, so the simulator
+    itself runs at full speed.
+    """
+    deadline = time.monotonic() + SIM_WALL_CLOCK_S
+    results: list[dict[str, Any]] = []
+
+    def line(frame: Any, event: str, arg: Any) -> Any:
+        if time.monotonic() > deadline:
+            raise _SimTimeout
+        return line
+
+    def call(frame: Any, event: str, arg: Any) -> Any:
+        return line if frame.f_code.co_filename == "<program>" else None
+
+    def worker() -> None:
+        sys.settrace(call)
+        try:
+            _sim_worker(code, seconds, max_speed, SimpleNamespace(put=results.append))
+        finally:
+            sys.settrace(None)
+
+    t = threading.Thread(target=worker, daemon=True)
+    t.start()
+    t.join(SIM_WALL_CLOCK_S + 5)
+    if not results or (time.monotonic() > deadline and "_SimTimeout" in str(results[0]["error"])):
+        return SimResult(False, HUNG)
+    result = results[0]
+    return SimResult(result["error"] is None, _summarize(result, seconds), result["distance"],
+                     result["trace"])
+
+
 def simulate(code: str, seconds: float, max_speed: int = 255) -> SimResult:
     """Run ``code`` in a child process so a program that never awaits can't hang us."""
     problem = check_dialect(code)
     if problem:
         return SimResult(False, f"ERROR: {problem}")
     seconds = max(1.0, min(120.0, float(seconds)))
+    if SIM_IN_THREAD:
+        return _simulate_in_thread(code, seconds, max_speed)
     ctx = multiprocessing.get_context("spawn")
     out = ctx.Queue()
     proc = ctx.Process(target=_sim_worker, args=(code, seconds, max_speed, out), daemon=True)
@@ -284,8 +337,7 @@ def simulate(code: str, seconds: float, max_speed: int = 255) -> SimResult:
     except queue.Empty:
         proc.kill()
         proc.join()
-        return SimResult(False, "ERROR: the simulation hung. A loop probably has no `await`; "
-                                "every loop needs one (e.g. `await delay(0.05)`).")
+        return SimResult(False, HUNG)
     proc.join()
     return SimResult(result["error"] is None, _summarize(result, seconds), result["distance"],
                      result["trace"])
