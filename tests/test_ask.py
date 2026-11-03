@@ -69,6 +69,15 @@ def test_simulate_then_propose_returns_proposal():
     assert "Travelled" in result["content"]
 
 
+def test_space_is_passed_on():
+    client = FakeClient(msg(text("ok"), stop="end_turn"))
+    convo(client, space_cm=50).send("drive a square")
+    assert "about 50 cm of clear floor" in client.requests[0]["messages"][0]["content"][-1]["text"]
+    client = FakeClient(msg(text("ok"), stop="end_turn"))
+    convo(client).send("drive a square")
+    assert "clear floor" not in client.requests[0]["messages"][0]["content"][-1]["text"]
+
+
 def test_follow_up_carries_owed_tool_result():
     client = FakeClient(
         msg(tool("propose_program", title="Forward", summary="s", code=GOOD)),

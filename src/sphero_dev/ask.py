@@ -317,6 +317,7 @@ class Conversation:
     client: Any
     max_speed: int = 255
     seconds: float = 30.0
+    space_cm: float | None = None
     effort: str = "medium"
     model: str = MODEL
     status: Callable[[str], None] = print
@@ -326,8 +327,10 @@ class Conversation:
 
     def send(self, text: str) -> Reply:
         if not self.messages:
+            space = (f" There is about {self.space_cm:g} cm of clear floor around the start; "
+                     "keep the whole path inside it." if self.space_cm else "")
             text = (f"{text}\n\n(Limits for this robot: speed is capped at {self.max_speed}, "
-                    f"and each run is stopped after {self.seconds:g} seconds.)")
+                    f"and each run is stopped after {self.seconds:g} seconds.{space})")
         # Tool results still owed from the last turn go in the same user message.
         self.messages.append({"role": "user",
                               "content": [*self._pending, {"type": "text", "text": text}]})

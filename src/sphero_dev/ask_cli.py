@@ -87,6 +87,7 @@ def ask_main(args: argparse.Namespace) -> int:
                   "Set ANTHROPIC_API_KEY (from console.anthropic.com).", file=sys.stderr)
             return 1
     convo = Conversation(client, max_speed=args.max_speed, seconds=args.seconds,
+                         space_cm=args.space,
                          effort=args.effort, model=args.model, status=_dim)
 
     message = " ".join(args.request) or _input("What should the robot do? ")
