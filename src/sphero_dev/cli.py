@@ -11,7 +11,7 @@ import shutil
 import sys
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
 from typing import Any, Callable, Iterator
@@ -119,8 +119,10 @@ class _PathRecorder:
     backend (stops the robot) rather than let it drive blind.
     """
 
-    def __init__(self, api: Any, toy: Any, backend: RobotBackend, every: float = 0.25):
+    def __init__(self, api: Any, toy: Any, backend: RobotBackend, every: float = 0.25,
+                 stop: threading.Event | None = None):
         self.api, self.toy, self.backend, self.every = api, toy, backend, every
+        self.stop_requested = stop
         self._errors0 = _decode_errors(toy)
         self._last_data = time.monotonic()
         if hasattr(toy, "sensor_control"):
@@ -142,7 +144,9 @@ class _PathRecorder:
         self._last_data = time.monotonic()
 
     def _check(self) -> None:
-        if _decode_errors(self.toy) - self._errors0 >= 3:
+        if self.stop_requested is not None and self.stop_requested.is_set():
+            self.backend.halt("stop was pressed")
+        elif _decode_errors(self.toy) - self._errors0 >= 3:
             self.backend.halt("the robot's Bluetooth data was garbled, so the program couldn't "
                               "tell where the robot was")
         elif time.monotonic() - self._last_data > 1.0:
@@ -187,11 +191,17 @@ class _PathRecorder:
 class RobotRun:
     summary: str  # one or two sentences for the user
     details: str  # the path, once a second, for Claude
+    # Every sensor sample: (t s, x cm, y cm, heading deg, speed cm/s, commanded speed).
+    samples: list[tuple[float, float, float, int, float, int]] = field(default_factory=list)
 
 
 def run_on_robot(source: str, robot: str | None, seconds: float | None,
-                 max_speed: int = 255, filename: str = "<program>") -> RobotRun:
-    """Find a robot, connect, and run an Edu-app program on it. Ctrl-C stops it."""
+                 max_speed: int = 255, filename: str = "<program>",
+                 stop: threading.Event | None = None) -> RobotRun:
+    """Find a robot, connect, and run an Edu-app program on it.
+
+    Ctrl-C stops it, and so does setting ``stop`` (from another thread).
+    """
     from spherov2 import scanner
     from spherov2.sphero_edu import SpheroEduAPI
 
@@ -215,7 +225,7 @@ def run_on_robot(source: str, robot: str | None, seconds: float | None,
         start = time.monotonic()
         how = "finished by itself"
         backend = RobotBackend(api, max_speed)
-        with _PathRecorder(api, toy, backend) as rec:
+        with _PathRecorder(api, toy, backend, stop=stop) as rec:
             try:
                 asyncio.run(run_source(source, backend, seconds, filename))
             except KeyboardInterrupt:
@@ -239,7 +249,7 @@ def run_on_robot(source: str, robot: str | None, seconds: float | None,
                     + ", ".join(f"{a:.0f}-{b:.0f} s" for a, b in stuck) + ".")
     details = ("Measured path, once a second (t s: x, y cm, heading deg, speed cm/s, "
                "commanded speed):\n" + rec.path())
-    return RobotRun(summary, details)
+    return RobotRun(summary, details, rec.samples)
 
 
 def _run_robot(args: argparse.Namespace) -> int:
@@ -341,7 +351,27 @@ def main(argv: list[str] | None = None) -> int:
                           "installed (default)")
     ask.add_argument("-o", "--out-dir", default=".", help="where [s]ave writes files")
 
+    serve = sub.add_parser("serve", help="HTTP API for the iPad app (ios/): Claude, the "
+                                         "simulator and the robot, driven from a phone or tablet")
+    serve.add_argument("--host", default="0.0.0.0",
+                       help="address to listen on (default: all, so the iPad can reach it)")
+    serve.add_argument("--port", type=int, default=8765, help="(default: 8765)")
+    serve.add_argument("--robot", metavar="NAME", help="robot name (default: first found)")
+    serve.add_argument("--seconds", type=float, default=30.0,
+                       help="stop each run after this long (default: 30)")
+    serve.add_argument("--max-speed", type=int, default=150, metavar="N",
+                       help="cap on speed, 0-255 (default: 150)")
+    serve.add_argument("--space", type=float, metavar="CM",
+                       help="clear floor around the start, in cm (default: not stated)")
+    serve.add_argument("--effort", default="medium", choices=["low", "medium", "high", "xhigh"])
+    serve.add_argument("--model", default="claude-sonnet-5-5")
+    serve.add_argument("--via", default="auto", choices=["auto", "claude-code", "api"])
+
     args = parser.parse_args(argv)
+    if args.command == "serve":
+        from .serve import serve_main
+
+        return serve_main(args)
     if args.command == "ask":
         from .ask_cli import ask_main
 

@@ -1,0 +1,4 @@
+SpheroChat.xcodeproj/
+SpheroChat/Info.plist
+SpheroChatCore/.build/
+SpheroChatCore/.swiftpm/

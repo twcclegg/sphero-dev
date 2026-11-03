@@ -182,6 +182,8 @@ class SimResult:
     ok: bool
     report: str
     distance: float = 0.0
+    # (t s, x cm, y cm, heading deg, ground speed cm/s), one per simulator step.
+    trace: list[tuple[float, float, float, int, float]] = field(default_factory=list)
 
 
 def _sim_worker(code: str, seconds: float, max_speed: int, out: Any) -> None:
@@ -285,7 +287,8 @@ def simulate(code: str, seconds: float, max_speed: int = 255) -> SimResult:
         return SimResult(False, "ERROR: the simulation hung. A loop probably has no `await`; "
                                 "every loop needs one (e.g. `await delay(0.05)`).")
     proc.join()
-    return SimResult(result["error"] is None, _summarize(result, seconds), result["distance"])
+    return SimResult(result["error"] is None, _summarize(result, seconds), result["distance"],
+                     result["trace"])
 
 
 # --- conversation -----------------------------------------------------------
@@ -300,6 +303,8 @@ class Proposal:
     summary: str
     code: str
     sim_report: str
+    # The simulated path: (t s, x cm, y cm, heading deg, speed cm/s).
+    sim_trace: list[tuple[float, float, float, int, float]] = field(default_factory=list)
 
 
 @dataclass
@@ -394,6 +399,7 @@ class Conversation:
             if result.distance < 1 and re.search(r"\b(roll|set_speed|raw_motor)\(", args["code"]):
                 return ("Not shown to the user: it sends drive commands but the robot never "
                         f"moved in the simulator. Fix that first.\n{result.report}"), True, None
-            proposal = Proposal(args["title"], args["summary"], args["code"], result.report)
+            proposal = Proposal(args["title"], args["summary"], args["code"], result.report,
+                                result.trace)
             return "Shown to the user, who decides whether to run it.", False, proposal
         return f"Unknown tool {name!r}.", True, None

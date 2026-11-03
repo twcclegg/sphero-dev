@@ -29,3 +29,13 @@ jobs:
           done
       - name: CLI smoke test
         run: sphero-dev run examples/edu_app/circles.py --sim --seconds 10
+
+  swift-core:
+    # The iPad app's platform-independent code (ios/SpheroChatCore). The SwiftUI
+    # app itself needs Xcode on a Mac and isn't built here.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tests
+        working-directory: ios/SpheroChatCore
+        run: swift test

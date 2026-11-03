@@ -1,0 +1,45 @@
+# XcodeGen spec for the iPad/iPhone app. On a Mac:
+#   brew install xcodegen && cd ios && xcodegen && open SpheroChat.xcodeproj
+name: SpheroChat
+options:
+  bundleIdPrefix: dev.clegg
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  SpheroChatCore:
+    path: SpheroChatCore
+targets:
+  SpheroChat:
+    type: application
+    platform: iOS
+    sources: [SpheroChat]
+    dependencies:
+      - package: SpheroChatCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.clegg.spherochat
+        PRODUCT_NAME: Sphero Chat
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: SpheroChat/Info.plist
+      properties:
+        CFBundleDisplayName: Sphero Chat
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations~ipad:
+          [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown,
+           UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations:
+          [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft,
+           UIInterfaceOrientationLandscapeRight]
+        NSMicrophoneUsageDescription: To dictate what the robot should do.
+        NSSpeechRecognitionUsageDescription: To turn what you say into text in the message box.
+        NSLocalNetworkUsageDescription: >-
+          To reach sphero-dev serve on the computer that drives the robot.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
