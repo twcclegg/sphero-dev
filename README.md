@@ -72,10 +72,10 @@ Claude writes an Edu-app program and checks it in the simulator, and you
 choose whether to run it, save it (`.py` and `.lab`), or describe a change.
 Linux and macOS. See [docs/ask.md](docs/ask.md).
 
-To do the same from an iPad or iPhone, run `sphero-dev serve` on the
-computer next to the robot and use the chat app in [`ios/`](ios/README.md)
-(typed or spoken requests, highlighted code, path and speed charts, sensor
-tables). It hasn't been built in Xcode yet.
+There's also an iPad/iPhone app in [`ios/`](ios/README.md) that does all of
+this on its own, with no computer: typed or spoken requests, highlighted
+code, path and speed charts, sensor tables. It hasn't been built in Xcode
+yet.
 
 ## What's here
 
@@ -83,7 +83,7 @@ tables). It hasn't been built in Xcode yet.
 AGENTS.md                 Rules and context for AI coding assistants
 src/sphero_dev/           The shim: run Edu-app programs on a robot or simulator
 tests/                    Simulator tests (no robot needed)
-ios/                      iPad/iPhone chat app for sphero-dev serve (SwiftUI)
+ios/                      Standalone iPad/iPhone app (SwiftUI + embedded Python)
 docs/
   getting-started-edu-app.md
   getting-started-desktop.md

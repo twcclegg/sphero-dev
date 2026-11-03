@@ -61,7 +61,7 @@ struct ChatView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
-                        store.newConversation()
+                        Task { await store.newConversation() }
                     } label: {
                         Label("New conversation", systemImage: "square.and.pencil")
                     }
@@ -80,7 +80,7 @@ struct ChatView: View {
             }
         }
         .onAppear {
-            if store.server == nil { showSettings = true }
+            if store.apiKey.isEmpty { showSettings = true }
         }
     }
 }

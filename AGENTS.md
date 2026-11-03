@@ -134,11 +134,13 @@ See [docs/ecosystem.md](docs/ecosystem.md).
 
 - Layout: `docs/` (guides and reference), `examples/edu_app/` (paste into the
   app), `examples/desktop/` (run with spherov2), `src/sphero_dev/` (the shim
-  and simulator), `tests/` (pytest, simulator only), `ios/` (SwiftUI chat
-  app that talks to `sphero-dev serve`, `src/sphero_dev/serve.py`).
-- `ios/SpheroChatCore` builds and tests on Linux (`swift test`); the SwiftUI
-  app needs Xcode. Keep the message format in `serve.py` and `Models.swift`
-  in step.
+  and simulator), `tests/` (pytest, simulator only), `ios/` (standalone iPad
+  app: SwiftUI, CoreBluetooth, and this package in an embedded Python).
+- The iOS app runs `src/sphero_dev/app.py` in its embedded Python, so code
+  there must run on iOS: no subprocesses, no compiled packages beyond the
+  standard library (spherov2's numpy use is covered by `numpy_lite.py`).
+  Keep the message format in `app.py` and `Models.swift` in step.
+  `ios/SpheroChatCore` tests on Linux (`swift test`); the app needs Xcode.
 - Before pushing: `ruff check .` and `python -m pytest`. Every Edu-app
   example is run in the simulator by the tests.
 - `sphero-dev ask` (`src/sphero_dev/ask.py`, `ask_cli.py`) puts the Edu-app

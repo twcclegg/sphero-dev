@@ -1,5 +1,6 @@
-# XcodeGen spec for the iPad/iPhone app. On a Mac:
-#   brew install xcodegen && cd ios && xcodegen && open SpheroChat.xcodeproj
+# XcodeGen spec for the iPad/iPhone app. On a Mac (see README.md):
+#   brew install xcodegen && cd ios && scripts/fetch-python.sh && xcodegen
+#   open SpheroChat.xcodeproj
 name: SpheroChat
 options:
   bundleIdPrefix: dev.clegg
@@ -15,6 +16,13 @@ targets:
     sources: [SpheroChat]
     dependencies:
       - package: SpheroChatCore
+      - framework: Frameworks/Python.xcframework
+        embed: true
+        codeSign: true
+    postBuildScripts:
+      - name: Install Python and sphero_dev
+        script: '"$PROJECT_DIR/scripts/install-python.sh"'
+        basedOnDependencyAnalysis: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.clegg.spherochat
@@ -24,6 +32,10 @@ targets:
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_STYLE: Automatic
+        SWIFT_OBJC_BRIDGING_HEADER: SpheroChat/Python/PythonBridge.h
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        FRAMEWORK_SEARCH_PATHS: ["$(inherited)", "$(BUILT_PRODUCTS_DIR)"]
+        HEADER_SEARCH_PATHS: ["$(inherited)", "$(BUILT_PRODUCTS_DIR)/Python.framework/Headers"]
     info:
       path: SpheroChat/Info.plist
       properties:
@@ -39,5 +51,4 @@ targets:
            UIInterfaceOrientationLandscapeRight]
         NSMicrophoneUsageDescription: To dictate what the robot should do.
         NSSpeechRecognitionUsageDescription: To turn what you say into text in the message box.
-        NSLocalNetworkUsageDescription: >-
-          To reach sphero-dev serve on the computer that drives the robot.
+        NSBluetoothAlwaysUsageDescription: To connect to your Sphero robot and drive it.

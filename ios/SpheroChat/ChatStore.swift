@@ -2,26 +2,33 @@ import Foundation
 import Observation
 import SpheroChatCore
 
-/// The conversation, the connection settings, and what's in progress.
+/// The conversation, the settings, and what's in progress. Claude, the
+/// simulator and the robot all run in the app's embedded Python
+/// (`sphero_dev.app`); this keeps the history and the settings.
 @MainActor @Observable
 final class ChatStore {
     enum Activity: Equatable { case idle, thinking, running }
 
-    var messages: [ChatMessage] = []
-    var conversation: String?
-    var activity: Activity = .idle
-    var address: String { didSet { UserDefaults.standard.set(address, forKey: "address") } }
-    var token: String { didSet { UserDefaults.standard.set(token, forKey: "token") } }
+    static let models = ["claude-sonnet-5-5", "claude-haiku-5-5", "claude-opus-5-5"]
 
-    var server: SpheroServer? { SpheroServer(address: address, token: token) }
+    var messages: [ChatMessage] = []
+    var activity: Activity = .idle
+
+    // Settings. The API key lives in the Keychain, the rest in UserDefaults.
+    var apiKey: String { didSet { Keychain.set("anthropic-api-key", apiKey) } }
+    var robotName: String { didSet { defaults.set(robotName, forKey: "robot") } }
+    var maxSpeed: Int { didSet { defaults.set(maxSpeed, forKey: "maxSpeed") } }
+    var seconds: Int { didSet { defaults.set(seconds, forKey: "seconds") } }
+    /// Clear floor around the start, cm; 0 = not stated (Claude assumes about 1.5 m).
+    var spaceCm: Int { didSet { defaults.set(spaceCm, forKey: "spaceCm") } }
+    var model: String { didSet { defaults.set(model, forKey: "model") } }
 
     /// The message holding the program a Run would run: the latest one with code.
     var latestProgramID: UUID? { messages.last(where: { $0.code != nil })?.id }
 
-    private struct Saved: Codable {
-        var conversation: String?
-        var messages: [ChatMessage]
-    }
+    private let defaults = UserDefaults.standard
+    /// Python's conversation starts empty each launch; say so once if there's history.
+    private var claudeRemembers = false
 
     private static var historyURL: URL {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -30,89 +37,91 @@ final class ChatStore {
     }
 
     init() {
-        address = UserDefaults.standard.string(forKey: "address") ?? ""
-        token = UserDefaults.standard.string(forKey: "token") ?? ""
+        apiKey = Keychain.get("anthropic-api-key") ?? ""
+        robotName = defaults.string(forKey: "robot") ?? ""
+        maxSpeed = defaults.object(forKey: "maxSpeed") as? Int ?? 150
+        seconds = defaults.object(forKey: "seconds") as? Int ?? 30
+        spaceCm = defaults.object(forKey: "spaceCm") as? Int ?? 0
+        model = defaults.string(forKey: "model") ?? Self.models[0]
         if let data = try? Data(contentsOf: Self.historyURL),
-           let saved = try? JSONDecoder().decode(Saved.self, from: data) {
-            messages = saved.messages
-            conversation = saved.conversation
+           let saved = try? JSONDecoder().decode([ChatMessage].self, from: data) {
+            messages = saved
         }
+    }
+
+    /// Hand the settings to Python. Called before each request, so edits apply at once.
+    private func configure() async {
+        let settings: [String: Any] = [
+            "api_key": apiKey, "model": model, "robot": robotName,
+            "seconds": seconds, "max_speed": maxSpeed,
+            "space_cm": spaceCm > 0 ? spaceCm : NSNull(),
+        ]
+        let data = (try? JSONSerialization.data(withJSONObject: settings)) ?? Data("{}".utf8)
+        _ = await PythonRuntime.call("configure", String(decoding: data, as: UTF8.self))
     }
 
     func send(_ raw: String) async {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, activity == .idle else { return }
-        guard let server else {
-            append(.text(.error, "Set the server address and token in Settings first."))
-            return
+        if !claudeRemembers && !messages.isEmpty {
+            append(.text(.status, "Claude starts afresh each time the app opens, so it won't "
+                         + "remember the messages above."))
         }
+        claudeRemembers = true
         append(.text(.user, text))
         activity = .thinking
         defer {
             activity = .idle
             save()
         }
-        do {
-            let reply: ChatResponse
-            do {
-                reply = try await server.chat(conversation: conversation, text: text)
-            } catch let e as ServerError where e.status == 404 && conversation != nil {
-                // The server keeps conversations in memory; it was restarted.
-                conversation = nil
-                append(.text(.status, "The server was restarted, so Claude starts afresh and "
-                             + "won't remember the messages above."))
-                reply = try await server.chat(conversation: nil, text: text)
-            }
-            conversation = reply.conversation
-            messages += reply.messages
-        } catch {
-            append(.text(.error, describe(error)))
-        }
+        await configure()
+        messages += decode(await PythonRuntime.call("chat", text))
     }
 
     func run() async {
-        guard activity == .idle, let server else { return }
-        guard let conversation else {
-            append(.text(.error, "The server doesn't have this program any more (it was "
-                         + "restarted). Ask for it again."))
-            return
-        }
+        guard activity == .idle else { return }
         activity = .running
         defer {
             activity = .idle
             save()
         }
-        do {
-            messages += try await server.run(conversation: conversation)
-        } catch {
-            append(.text(.error, describe(error)))
-        }
+        await configure()
+        messages += decode(await PythonRuntime.call("run"))
     }
 
     func stop() async {
-        do {
-            try await server?.stop()
-        } catch {
-            append(.text(.error, "Couldn't send stop: \(describe(error))"))
-        }
+        _ = await PythonRuntime.call("stop")
     }
 
-    /// Downloads the latest program as a `.lab` file for the Sphero Edu app's Import.
+    /// The latest program as a `.lab` file, for the Sphero Edu app's Import.
     func labFile() async throws -> URL {
-        guard let server, let conversation else {
-            throw ServerError(status: 404, message: "The server doesn't have this program any more.")
+        struct LabFile: Decodable { var name: String?; var content: String? }
+        let json = await PythonRuntime.call("lab_file")
+        let f = try JSONDecoder().decode(LabFile.self, from: Data(json.utf8))
+        guard let name = f.name, let content = f.content else {
+            throw CocoaError(.fileNoSuchFile, userInfo: [
+                NSLocalizedDescriptionKey: "Claude doesn't have this program any more (the app "
+                    + "restarted). Ask for it again."])
         }
-        let (name, data) = try await server.programLab(conversation: conversation)
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
-        try data.write(to: url, options: .atomic)
+        try Data(content.utf8).write(to: url, options: .atomic)
         return url
     }
 
-    func newConversation() {
+    func newConversation() async {
         guard activity == .idle else { return }
         messages = []
-        conversation = nil
         save()
+        _ = await PythonRuntime.call("new_conversation")
+    }
+
+    private func decode(_ json: String) -> [ChatMessage] {
+        struct Reply: Decodable { var messages: [ChatMessage]? }
+        do {
+            return try JSONDecoder.snakeCase.decode(Reply.self, from: Data(json.utf8)).messages ?? []
+        } catch {
+            return [.text(.error, "Couldn't read the reply: \(error.localizedDescription)")]
+        }
     }
 
     private func append(_ m: ChatMessage) {
@@ -120,27 +129,8 @@ final class ChatStore {
     }
 
     private func save() {
-        let saved = Saved(conversation: conversation, messages: messages)
-        if let data = try? JSONEncoder().encode(saved) {
+        if let data = try? JSONEncoder().encode(messages) {
             try? data.write(to: Self.historyURL, options: .atomic)
         }
-    }
-
-    private func describe(_ error: Error) -> String {
-        if let e = error as? ServerError {
-            return e.status == 401 ? "The server rejected the token. Check it in Settings."
-                                   : e.message
-        }
-        if let e = error as? URLError {
-            switch e.code {
-            case .cannotConnectToHost, .cannotFindHost, .timedOut, .networkConnectionLost,
-                 .notConnectedToInternet:
-                return "Couldn't reach the server at \(address). Is `sphero-dev serve` running, "
-                    + "and is this iPad on the same Wi-Fi? (\(e.localizedDescription))"
-            default:
-                break
-            }
-        }
-        return error.localizedDescription
     }
 }

@@ -1,105 +1,84 @@
 # Sphero Chat (iPad / iPhone)
 
-A chat app for `sphero-dev ask`: type or dictate what the robot should do,
-Claude writes and simulates the program, and you tap **Run on robot**.
-Replies show the program with syntax highlighting, the simulated and
-measured paths as charts, speed over time, and a table of sensor readings
-(shareable as CSV). **Export .lab** saves the program for the Sphero Edu
-app's Import.
+Type or dictate what the robot should do. Claude writes an Edu-app program
+and checks it in the simulator; you tap **Run on robot**. Replies show the
+program with syntax highlighting, the simulated and measured paths as charts,
+speed over time, and a table of sensor readings (shareable as CSV). **Export
+.lab** saves the program for the Sphero Edu app's Import.
 
-**Status: only partly checked.** I haven't built the SwiftUI app: that needs
-Xcode, and this was written on Linux. `SpheroChatCore` (message format, HTTP
-client, highlighter) builds and passes its tests on Linux, including a test
-against a running `sphero-dev serve` with a fake Claude and robot. Expect some
-compile fixes the first time it's opened in Xcode, and it hasn't been used
-with a real robot.
+**Everything runs on the iPad.** No laptop or server: the app talks to the
+robot over Bluetooth and to Claude over the internet.
+
+**Status: not built yet.** It was written on Linux, which can't build iOS
+apps. What has been checked there:
+- the Python side (`src/sphero_dev/app.py`, `ios_adapter.py`, `claude_api.py`,
+  `numpy_lite.py`, in-thread simulation): pytest, with fakes for Claude,
+  Bluetooth and the robot;
+- `SpheroChat/Python/PythonBridge.c`: compiled and run against Linux's Python
+  with fake Bluetooth functions;
+- `SpheroChatCore` (message format, highlighter): `swift test` on Linux.
+
+The SwiftUI screens and the CoreBluetooth code have never been compiled.
+Expect fixes the first time it's opened in Xcode, and it hasn't driven a
+robot yet.
 
 ## How it fits together
 
-The app is a thin client. The computer next to the robot does the work: it
-runs `sphero-dev serve`, which talks to Claude (your subscription through the
-`claude` CLI, or `ANTHROPIC_API_KEY`), runs the simulator, and drives the
-robot over Bluetooth like `sphero-dev ask` does.
-
 ```
-iPad  --Wi-Fi, HTTP + token-->  computer: sphero-dev serve  --Bluetooth-->  BOLT+
+SwiftUI screens ── ChatStore ── PythonRuntime ──> embedded CPython 3.13
+                                                   sphero_dev.app
+                                                    ├─ ask.Conversation ── claude_api ──> Claude API (HTTPS)
+                                                    ├─ simulator (in a thread, with a watchdog)
+                                                    └─ spherov2 + BOLTPlus ── ios_adapter
+                                                                                │  _sphero_ble (C)
+CoreBluetooth <── BluetoothBridge.swift <────────────────────────────────────────┘
 ```
 
-## Run it
+- **Python** comes from BeeWare's
+  [Python-Apple-support](https://github.com/beeware/Python-Apple-support)
+  (`Python.xcframework`). The app's code is the same `sphero_dev` package the
+  CLI uses, so programs are Edu-app Python and export to the Sphero Edu app.
+- **Bluetooth**: spherov2 does the Sphero protocol in Python. Its adapter
+  (`ios_adapter.IOSAdapter`) passes scan / connect / write / notify to
+  `BluetoothBridge.swift` through a small built-in C module.
+- **Claude**: the Messages API, with your Anthropic API key, kept in the
+  Keychain. Your Claude subscription can't be used from a third-party app as
+  far as I know; if Anthropic offers a sign-in for that, it would replace
+  the key in Settings and `claude_api.ApiClient`.
 
-1. On the computer (Linux or macOS, next to the robot):
-
-   ```bash
-   pip install -e '.[ai]'
-   sphero-dev serve --robot BP-5FBB --space 80
-   ```
-
-   It prints the address and token to enter in the app. The token is kept
-   in `~/.config/sphero-dev/serve-token`; delete that file for a new one.
-   Options match `sphero-dev ask` (`--max-speed`, `--seconds`, `--space`,
-   `--model`, `--via`) plus `--port` (8765).
-
-   For the app, give it a certificate (next section); iOS won't talk plain
-   HTTP to it.
-
-2. On a Mac with Xcode 15+:
-
-   ```bash
-   brew install xcodegen
-   cd ios && xcodegen && open SpheroChat.xcodeproj
-   ```
-
-   Choose your team under Signing & Capabilities and run on the iPad.
-
-3. In the app, open Settings, enter the server and token, and tap **Test
-   connection**. iOS asks for Local Network access the first time; allow it.
-
-## Notes
-
-- **Stop** (in the message and the input bar) halts the robot through the
-  server. Every run also stops at `--seconds` and is capped at `--max-speed`.
-- The server keeps conversations in memory. If it restarts, the app keeps its
-  history but Claude starts afresh.
-- The token is stored in the app's UserDefaults, not the Keychain.
-- Dictation uses Apple's speech recognizer, on the device when supported.
-- The server API and message format are documented at the top of
-  `src/sphero_dev/serve.py`.
-
-## HTTPS with a real certificate
-
-`sphero.clegg.dev` is a public DNS name that points at the laptop's address
-on the home network (192.168.1.102). Only devices at home can reach it, and
-the router's port forwarding isn't involved. The Let's Encrypt certificate
-comes from a DNS-01 check through the GoDaddy API, so the server never has to
-be reachable from the internet. The token is the one minecraft.clegg.dev's
-DDNS already uses (`~/.config/godaddy/api.env`).
+## Build it (Mac with Xcode 15.3+)
 
 ```bash
-go install github.com/go-acme/lego/v4/cmd/lego@latest   # once; lands in ~/go/bin
-PATH=$HOME/go/bin:$PATH deploy/cert.sh                  # gets the certificate
-L=~/.local/share/sphero-dev/lego/certificates
-sphero-dev serve --cert $L/sphero.clegg.dev.crt --key $L/sphero.clegg.dev.key \
-    --name sphero.clegg.dev --robot BP-5FBB
-# Renew automatically (daily check; renews 30 days before expiry):
-cp deploy/sphero-dev-cert.* ~/.config/systemd/user/
-systemctl --user daemon-reload && systemctl --user enable --now sphero-dev-cert.timer
+brew install xcodegen
+cd ios
+scripts/fetch-python.sh     # Python.xcframework + spherov2/certifi (once)
+xcodegen                    # writes SpheroChat.xcodeproj
+open SpheroChat.xcodeproj
 ```
 
-`serve` reloads the certificate when the file changes, so renewals need no
-restart. `deploy/cert.sh` also re-points the DNS record if the laptop's
-address changes; a DHCP reservation for the laptop in the router avoids that.
+Choose your team under Signing & Capabilities, connect the iPad and Run.
+With a free Apple account the app stops opening after 7 days until you
+run it from Xcode again; the paid developer program removes that limit.
 
-**The router's DNS won't answer for it.** It has DNS rebinding protection:
-it drops answers where a public name points at a home address. So on the
-iPad, set the Wi-Fi network's DNS by hand: Settings → Wi-Fi → (i) next to
-the network → Configure DNS → Manual, remove the router's server, add
-`1.1.1.1` and `1.0.0.1`. (This laptop already uses 1.1.1.1.)
+The build phase `scripts/install-python.sh` copies Python's standard library,
+`src/sphero_dev` and the packages into the app.
+
+## Use it
+
+1. Settings: paste an Anthropic API key (console.anthropic.com). Tap **Find
+   robots** and pick yours (BOLT+ names start `BP-`). Set the top speed, the
+   time limit and the floor space.
+2. Wake the robot, and close the Sphero Edu app so it isn't connected.
+3. Ask for something, check the program and the simulated path, tap **Run
+   on robot**, aim the robot so its blue tail light faces you. **Stop** halts
+   it at once; every run also stops at the time limit.
+
+Conversations with Claude last until the app closes; the history on screen
+is kept.
 
 ## Testing
 
 ```bash
-cd ios/SpheroChatCore && swift test           # Linux or macOS
-# Against a live server with a fake Claude and robot:
-python tests/serve_fixture.py 18765 tok &
-SPHERO_TEST_SERVER=http://127.0.0.1:18765 SPHERO_TEST_TOKEN=tok swift test
+python -m pytest tests/test_ios_python.py      # the Python side, on any computer
+cd ios/SpheroChatCore && swift test            # Linux or macOS
 ```
