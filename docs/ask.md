@@ -73,6 +73,7 @@ Otherwise, or with `--via api`, it calls the API with `ANTHROPIC_API_KEY`
 | `--robot NAME` | first robot found | e.g. `BP-5FBB` (BOLT+ names start `BP-`, BOLT `SB-`) |
 | `--seconds N` | 30 | every run on the robot stops after this |
 | `--max-speed N` | 150 | hard cap, 0-255, enforced by the backend whatever the program asks; Claude is told about it too |
+| `--space CM` | not stated | clear floor around the start; Claude keeps the path inside it. Without it Claude assumes about 1.5 m |
 | `--model` | `claude-sonnet-5-5` | `claude-haiku-5-5` is faster and cheaper |
 | `--via` | `auto` | `claude-code` (subscription, through `claude -p`), `api` (`ANTHROPIC_API_KEY`), or `auto`: `claude-code` when `claude` is on PATH |
 | `--effort` | medium | Claude's reasoning effort: `low` is faster and cheaper, `high` is for tricky paths |

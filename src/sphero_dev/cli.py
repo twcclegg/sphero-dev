@@ -327,6 +327,9 @@ def main(argv: list[str] | None = None) -> int:
                      help="stop each run after this long (default: 30)")
     ask.add_argument("--max-speed", type=int, default=150, metavar="N",
                      help="cap on speed, 0-255, for the robot and the simulator (default: 150)")
+    ask.add_argument("--space", type=float, metavar="CM",
+                     help="clear floor around the start, in cm; Claude keeps the path inside "
+                          "it (default: not stated, Claude assumes about 1.5 m)")
     ask.add_argument("--effort", default="medium", choices=["low", "medium", "high", "xhigh"],
                      help="how hard Claude thinks (default: medium)")
     ask.add_argument("--model", default="claude-sonnet-5-5",
