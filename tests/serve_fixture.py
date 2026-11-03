@@ -1,6 +1,6 @@
 """Runs `sphero-dev serve` with a scripted Claude and a fake robot, for the Swift client's
 live test: python tests/serve_fixture.py PORT TOKEN, then
-SPHERO_TEST_SERVER=127.0.0.1:PORT SPHERO_TEST_TOKEN=TOKEN swift test (in ios/SpheroChatCore).
+SPHERO_TEST_SERVER=http://127.0.0.1:PORT SPHERO_TEST_TOKEN=TOKEN swift test (in ios/SpheroChatCore).
 """
 
 import sys

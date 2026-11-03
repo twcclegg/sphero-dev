@@ -356,6 +356,11 @@ def main(argv: list[str] | None = None) -> int:
     serve.add_argument("--host", default="0.0.0.0",
                        help="address to listen on (default: all, so the iPad can reach it)")
     serve.add_argument("--port", type=int, default=8765, help="(default: 8765)")
+    serve.add_argument("--cert", metavar="PEM", help="TLS certificate chain; with --key, serve "
+                                                     "HTTPS (reloaded when the file changes)")
+    serve.add_argument("--key", metavar="PEM", help="TLS private key")
+    serve.add_argument("--name", metavar="HOST", help="the name the certificate is for, e.g. "
+                                                      "sphero.clegg.dev (only for the printout)")
     serve.add_argument("--robot", metavar="NAME", help="robot name (default: first found)")
     serve.add_argument("--seconds", type=float, default=30.0,
                        help="stop each run after this long (default: 30)")

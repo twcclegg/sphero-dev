@@ -81,8 +81,10 @@ final class ModelTests: XCTestCase {
     }
 
     func testServerAddress() {
-        XCTAssertEqual(SpheroServer(address: "192.168.1.20", token: " t ")?.baseURL.absoluteString,
-                       "http://192.168.1.20:8765")
+        XCTAssertEqual(SpheroServer(address: "sphero.clegg.dev", token: "t")?.baseURL
+                        .absoluteString, "https://sphero.clegg.dev:8765")
+        XCTAssertEqual(SpheroServer(address: "http://192.168.1.20", token: "t")?.baseURL
+                        .absoluteString, "http://192.168.1.20:8765")
         XCTAssertEqual(SpheroServer(address: "http://laptop.local:9000", token: "t")?.baseURL
                         .absoluteString, "http://laptop.local:9000")
         XCTAssertEqual(SpheroServer(address: "192.168.1.20", token: " t ")?.token, "t")

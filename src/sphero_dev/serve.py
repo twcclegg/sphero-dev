@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import json
 import secrets
+import ssl
 import sys
 import threading
 import uuid
@@ -300,6 +301,47 @@ def make_handler(app: App) -> type[BaseHTTPRequestHandler]:
     return Handler
 
 
+class TLSServer(ThreadingHTTPServer):
+    """HTTPS. The TLS handshake runs in each request's thread, and the certificate is
+    reloaded when its file changes, so a renewal needs no restart."""
+
+    def __init__(self, address: tuple[str, int], handler: Any, cert: str, key: str):
+        self.cert, self.key = cert, key
+        self._ctx_lock = threading.Lock()
+        self._load()
+        super().__init__(address, handler)
+
+    def _mtimes(self) -> tuple[float, float]:
+        return Path(self.cert).stat().st_mtime, Path(self.key).stat().st_mtime
+
+    def _load(self) -> None:
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+        ctx.load_cert_chain(self.cert, self.key)
+        self.ctx, self._loaded = ctx, self._mtimes()
+
+    def _context(self) -> ssl.SSLContext:
+        with self._ctx_lock:
+            try:
+                if self._mtimes() != self._loaded:
+                    self._load()
+                    sys.stderr.write("Reloaded the TLS certificate.\n")
+            except (OSError, ssl.SSLError) as e:  # mid-renewal; keep the old one
+                sys.stderr.write(f"Couldn't reload the certificate: {e}\n")
+            return self.ctx
+
+    def finish_request(self, request: Any, client_address: Any) -> None:
+        request.settimeout(60)
+        try:
+            tls = self._context().wrap_socket(request, server_side=True)
+        except (ssl.SSLError, OSError):
+            return  # a scanner, or a client that doesn't trust the certificate
+        try:
+            self.RequestHandlerClass(tls, client_address, self)
+        finally:
+            tls.close()
+
+
 def _lan_addresses() -> list[str]:
     import socket
 
@@ -336,12 +378,27 @@ def serve_main(args: argparse.Namespace) -> int:
 
     app = App(make_client, run_on_robot, args.robot, args.seconds, args.max_speed, args.space,
               args.model, args.effort, load_token())
-    server = ThreadingHTTPServer((args.host, args.port), make_handler(app))
+    if bool(args.cert) != bool(args.key):
+        print("--cert and --key go together.", file=sys.stderr)
+        return 1
+    if args.cert:
+        server: ThreadingHTTPServer = TLSServer((args.host, args.port), make_handler(app),
+                                                args.cert, args.key)
+        scheme = "https"
+    else:
+        server = ThreadingHTTPServer((args.host, args.port), make_handler(app))
+        scheme = "http"
     server.daemon_threads = True
-    print(f"Serving the Sphero app API on port {args.port} (Claude via {via}).")
+    print(f"Serving the Sphero app API over {scheme.upper()} on port {args.port} "
+          f"(Claude via {via}).")
     print("In the app's Settings, enter:")
-    for a in (_lan_addresses() if args.host in ("0.0.0.0", "") else [args.host]):
-        print(f"  Server: http://{a}:{args.port}")
+    hosts = ([args.name] if args.name
+             else _lan_addresses() if args.host in ("0.0.0.0", "") else [args.host])
+    for h in hosts:
+        print(f"  Server: {scheme}://{h}:{args.port}")
+    if scheme == "http":
+        print("  (Plain HTTP: anyone on this network can read the traffic, token included. "
+              "See ios/README.md for HTTPS.)")
     print(f"  Token:  {app.token}")
     print("Ctrl-C stops the server.", flush=True)
     try:

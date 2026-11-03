@@ -39,6 +39,9 @@ iPad  --Wi-Fi, HTTP + token-->  computer: sphero-dev serve  --Bluetooth-->  BOLT
    Options match `sphero-dev ask` (`--max-speed`, `--seconds`, `--space`,
    `--model`, `--via`) plus `--port` (8765).
 
+   For the app, give it a certificate (next section); iOS won't talk plain
+   HTTP to it.
+
 2. On a Mac with Xcode 15+:
 
    ```bash
@@ -57,12 +60,40 @@ iPad  --Wi-Fi, HTTP + token-->  computer: sphero-dev serve  --Bluetooth-->  BOLT
   server. Every run also stops at `--seconds` and is capped at `--max-speed`.
 - The server keeps conversations in memory. If it restarts, the app keeps its
   history but Claude starts afresh.
-- The server speaks plain HTTP with a bearer token. Use it on a home network
-  you trust, not on public Wi-Fi.
 - The token is stored in the app's UserDefaults, not the Keychain.
 - Dictation uses Apple's speech recognizer, on the device when supported.
 - The server API and message format are documented at the top of
   `src/sphero_dev/serve.py`.
+
+## HTTPS with a real certificate
+
+`sphero.clegg.dev` is a public DNS name that points at the laptop's address
+on the home network (192.168.1.102). Only devices at home can reach it, and
+the router's port forwarding isn't involved. The Let's Encrypt certificate
+comes from a DNS-01 check through the GoDaddy API, so the server never has to
+be reachable from the internet. The token is the one minecraft.clegg.dev's
+DDNS already uses (`~/.config/godaddy/api.env`).
+
+```bash
+go install github.com/go-acme/lego/v4/cmd/lego@latest   # once; lands in ~/go/bin
+PATH=$HOME/go/bin:$PATH deploy/cert.sh                  # gets the certificate
+L=~/.local/share/sphero-dev/lego/certificates
+sphero-dev serve --cert $L/sphero.clegg.dev.crt --key $L/sphero.clegg.dev.key \
+    --name sphero.clegg.dev --robot BP-5FBB
+# Renew automatically (daily check; renews 30 days before expiry):
+cp deploy/sphero-dev-cert.* ~/.config/systemd/user/
+systemctl --user daemon-reload && systemctl --user enable --now sphero-dev-cert.timer
+```
+
+`serve` reloads the certificate when the file changes, so renewals need no
+restart. `deploy/cert.sh` also re-points the DNS record if the laptop's
+address changes; a DHCP reservation for the laptop in the router avoids that.
+
+**The router's DNS won't answer for it.** It has DNS rebinding protection:
+it drops answers where a public name points at a home address. So on the
+iPad, set the Wi-Fi network's DNS by hand: Settings → Wi-Fi → (i) next to
+the network → Configure DNS → Manual, remove the router's server, add
+`1.1.1.1` and `1.0.0.1`. (This laptop already uses 1.1.1.1.)
 
 ## Testing
 
@@ -70,5 +101,5 @@ iPad  --Wi-Fi, HTTP + token-->  computer: sphero-dev serve  --Bluetooth-->  BOLT
 cd ios/SpheroChatCore && swift test           # Linux or macOS
 # Against a live server with a fake Claude and robot:
 python tests/serve_fixture.py 18765 tok &
-SPHERO_TEST_SERVER=127.0.0.1:18765 SPHERO_TEST_TOKEN=tok swift test
+SPHERO_TEST_SERVER=http://127.0.0.1:18765 SPHERO_TEST_TOKEN=tok swift test
 ```

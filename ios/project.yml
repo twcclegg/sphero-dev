@@ -41,5 +41,3 @@ targets:
         NSSpeechRecognitionUsageDescription: To turn what you say into text in the message box.
         NSLocalNetworkUsageDescription: >-
           To reach sphero-dev serve on the computer that drives the robot.
-        NSAppTransportSecurity:
-          NSAllowsLocalNetworking: true

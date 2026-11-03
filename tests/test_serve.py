@@ -99,3 +99,53 @@ def test_errors(server):
     assert call("/chat", {"conversation": "nope", "text": "hi"})[0] == 404
     assert call("/run", {"conversation": "nope"})[0] == 404
     assert call("/stop", {}) == (200, {"stopping": False})
+
+
+def _self_signed(tmp_path, name):
+    import shutil
+    import subprocess
+
+    if not shutil.which("openssl"):
+        pytest.skip("needs the openssl command")
+    cert, key = tmp_path / f"{name}.pem", tmp_path / f"{name}.key"
+    subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+                    "-subj", f"/CN={name}", "-addext", f"subjectAltName=DNS:{name}",
+                    "-keyout", str(key), "-out", str(cert)],
+                   check=True, capture_output=True)
+    return cert, key
+
+
+def test_https_and_certificate_reload(tmp_path):
+    import os
+    import ssl
+
+    cert, key = _self_signed(tmp_path, "localhost")
+    app = serve.App(lambda: None, FakeRobot(), None, 5.0, 120, None, "m", "low", "secret")
+    httpd = serve.TLSServer(("127.0.0.1", 0), serve.make_handler(app), str(cert), str(key))
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    url = f"https://localhost:{httpd.server_address[1]}/health"
+
+    def get(cafile):
+        ctx = ssl.create_default_context(cafile=str(cafile))
+        req = urllib.request.Request(url, headers={"Authorization": "Bearer secret"})
+        with urllib.request.urlopen(req, context=ctx, timeout=10) as r:
+            return json.loads(r.read())
+
+    try:
+        assert get(cert)["ok"]
+        # Plain HTTP to the HTTPS port gets nowhere.
+        with pytest.raises((urllib.error.URLError, ConnectionError)):
+            urllib.request.urlopen(url.replace("https", "http"), timeout=5)
+        # A renewed certificate is picked up without a restart.
+        def presented():
+            pem = ssl.get_server_certificate(("127.0.0.1", httpd.server_address[1]))
+            return ssl.PEM_cert_to_DER_cert(pem)
+
+        assert presented() == ssl.PEM_cert_to_DER_cert(cert.read_text())
+        new_cert, new_key = _self_signed(tmp_path, "renewed")
+        os.replace(new_key, key)
+        os.replace(new_cert, cert)
+        os.utime(cert, (1, 1))  # make sure the mtime differs even within a second
+        assert presented() == ssl.PEM_cert_to_DER_cert(cert.read_text())
+    finally:
+        httpd.shutdown()

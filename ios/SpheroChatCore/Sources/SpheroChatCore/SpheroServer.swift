@@ -19,11 +19,12 @@ public struct SpheroServer: Sendable {
         self.token = token
     }
 
-    /// Accepts "192.168.1.20", "192.168.1.20:8765" or a full URL.
+    /// Accepts "sphero.clegg.dev", "sphero.clegg.dev:8765" or a full URL. Without a
+    /// scheme it's HTTPS; give "http://..." explicitly for a server without a certificate.
     public init?(address: String, token: String) {
         var s = address.trimmingCharacters(in: .whitespacesAndNewlines)
         if s.isEmpty { return nil }
-        if !s.contains("://") { s = "http://" + s }
+        if !s.contains("://") { s = "https://" + s }
         guard var parts = URLComponents(string: s), parts.host?.isEmpty == false else { return nil }
         if parts.port == nil { parts.port = 8765 }
         guard let url = parts.url else { return nil }

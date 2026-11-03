@@ -13,7 +13,7 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("192.168.1.20:8765", text: $store.address)
+                    TextField("sphero.clegg.dev", text: $store.address)
                         .keyboardType(.URL)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
